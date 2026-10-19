@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battle Analysis results</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd23f}a:hover{color:#ffe27a}
+</style>
+</helmet>
+<div style="width: 360px; height: 420px; box-sizing: border-box; padding: 30px; background: #33402f; display: flex; align-items: flex-start; justify-content: center; font-family: Nunito, system-ui, sans-serif">
+<div style="width: 300px; box-sizing: border-box; padding: 10px; border-radius: 12px; background: #2b3139; border: 2px solid #8c939c; box-shadow: inset 0 0 0 1px #4d555f, 0 6px 18px rgba(0,0,0,0.45); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 0 4px">
+<div style="display: flex; align-items: center; gap: 8px">
+<div style="font-size: 15px; font-weight: 900; letter-spacing: 0.04em; color: #f4f4f4">BATTLE ANALYSIS</div>
+<div style="padding: 2px 7px; border-radius: 9px; background: #2d3f1a; border: 1px solid #6fa52e; font-size: 10px; font-weight: 900; color: #d6f2b0">RESULTS</div>
+</div>
+<div style="display: flex; gap: 4px">
+<button aria-label="Help" style="width: 24px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid #5c636c; background: #3d444d; color: #e8e8e8; font: 800 13px Nunito, sans-serif">?</button>
+<button aria-label="Close" style="width: 24px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid #a8561a; background: #e07a24; color: #ffffff; font: 900 14px Nunito, sans-serif">×</button>
+</div>
+</div>
+<div style="padding: 10px 12px; border-radius: 8px; background: #1c2127; border: 1px solid #47505a; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 700; color: #a9b0b8"><span>SESSION ENDED</span><span>Lv. 59 → Lv. 60</span></div>
+<div style="height: 6px; border-radius: 3px; background: #3a414a; overflow: hidden"><div style="width: 8%; height: 6px; background: #b8e04a"></div></div>
+<div style="height: 4px"></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>Battle Duration</span><span style="color: {{accent}}">01:12:05</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>EXP Acquired</span><span style="color: {{accent}}">186,912</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #c4cad1; padding-left: 10px"><span>per min</span><span>2,593 / min</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>Mesos Acquired</span><span style="color: {{accent}}">94,377</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #c4cad1; padding-left: 10px"><span>per min</span><span>1,309 / min</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #c4cad1"><span>Paused</span><span>6m 40s (not counted)</span></div>
+</div>
+<button style="height: 46px; border-radius: 23px; border: 2px solid #4d7a18; background: #79b534; box-shadow: inset 0 2px 0 #a4d65e; color: #ffffff; font: 900 18px Nunito, sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px">
+<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.4-5.7"></path><path d="M20 4v5h-5"></path></svg>
+Start New Session</button>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#ffd23f","options":["#ffd23f","#ffb84a","#9fe0ff"]},"$preview":{"width":360,"height":420}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#ffd23f' };
+}
+}
+</script>
+</body>
+</html>
