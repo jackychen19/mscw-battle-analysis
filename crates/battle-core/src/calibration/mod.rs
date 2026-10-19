@@ -5,7 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::capture::RectPt;
-use crate::parse::Bitmap;
+use crate::parse::{Bitmap, GlyphTemplate};
 
 pub const CALIBRATION_VERSION: u32 = 1;
 
@@ -33,12 +33,6 @@ pub struct Regions {
     pub exp_text: RectPt,
     pub level: RectPt,
     pub notifications: RectPt,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GlyphTemplate {
-    pub ch: char,
-    pub bitmap: Bitmap,
 }
 
 /// Templates are captured at the user's actual scale factor and only valid there.
