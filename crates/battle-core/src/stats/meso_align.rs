@@ -32,7 +32,10 @@ pub fn align(prev: &[Line], cur: &[Line], freshness_tolerance: u8) -> Alignment 
             let kept = &prev[shift..];
             let matches = kept.len() <= cur.len()
                 && kept.iter().zip(cur).all(|(p, c)| {
-                    p.same_text(c) && c.freshness <= p.freshness.saturating_add(freshness_tolerance)
+                    let faded = p.is_unknown()
+                        || c.is_unknown()
+                        || c.freshness <= p.freshness.saturating_add(freshness_tolerance);
+                    p.same_text(c) && faded
                 });
             matches.then_some(Alignment { shift, overlap: kept.len() })
         })
@@ -42,7 +45,7 @@ pub fn align(prev: &[Line], cur: &[Line], freshness_tolerance: u8) -> Alignment 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stats::LineKind::{Exp, Meso, Other};
+    use crate::stats::LineKind::{Exp, Meso, Other, Unknown};
 
     fn m(amount: u64, freshness: u8) -> Line {
         Line::new(Meso, amount, freshness)
@@ -96,6 +99,16 @@ mod tests {
         let prev = [Line::new(Exp, 15, 200), m(15, 220)];
         let cur = [m(15, 210), Line::new(Other, 99, 255)];
         assert_eq!(align(&prev, &cur, DEFAULT_FRESHNESS_TOLERANCE), Alignment { shift: 1, overlap: 1 });
+    }
+
+    #[test]
+    fn unknown_lines_match_anything() {
+        let u = Line::new(Unknown, 0, 0);
+        // A covered line in the middle doesn't break the alignment.
+        assert_eq!(new_amounts(&[m(1, 200), u, m(3, 240)], &[m(1, 190), m(2, 230), m(3, 230), m(4, 255)]), vec![4]);
+        // Ambiguous with a wildcard: the no-new-lines reading wins, so a
+        // duplicate arriving while its neighbour is covered can be missed.
+        assert_eq!(new_amounts(&[m(15, 120), u], &[u, m(15, 255)]), Vec::<u64>::new());
     }
 
     #[test]

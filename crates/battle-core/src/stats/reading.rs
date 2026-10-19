@@ -27,6 +27,9 @@ pub enum LineKind {
     PartyBonus,
     /// Any other notification. Still takes part in stack alignment.
     Other,
+    /// A line is there but couldn't be read (faded, or a sprite is drawn over
+    /// it). Matches any line when aligning stacks.
+    Unknown,
 }
 
 /// One line of the notification stack.
@@ -47,7 +50,13 @@ impl Line {
         Self { kind, amount, freshness }
     }
 
+    /// Whether two lines could be the same line: same text, or either is
+    /// [`LineKind::Unknown`].
     pub fn same_text(&self, other: &Line) -> bool {
-        self.kind == other.kind && self.amount == other.amount
+        self.is_unknown() || other.is_unknown() || (self.kind == other.kind && self.amount == other.amount)
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        self.kind == LineKind::Unknown
     }
 }

@@ -83,7 +83,9 @@ pub struct Session {
     /// Set on Start/Resume: the next accepted reading/stack is a baseline,
     /// so gains while paused (or lines already on screen) aren't counted.
     exp_needs_baseline: bool,
-    last_stack: Option<Vec<Line>>,
+    /// The previous confirmed stack, each line with whether it has been
+    /// counted (or was already on screen when recording started).
+    last_stack: Option<Vec<(Line, bool)>>,
 
     exp_gained: u64,
     meso_gained: u64,
@@ -281,20 +283,34 @@ impl Session {
         gain
     }
 
+    /// Counts each notification line once. A line is counted the first time
+    /// it is read as a known kind, so one that was covered (Unknown) when it
+    /// appeared is still counted once it becomes readable.
     fn accept_stack(&mut self, stack: Vec<Line>) {
-        if let Some(prev) = &self.last_stack {
-            let alignment = align(prev, &stack, self.freshness_tolerance);
-            if alignment.overlap == 0 && !prev.is_empty() && !stack.is_empty() {
-                self.meso_possible_undercount = true;
-            }
-            for line in alignment.new_lines(&stack) {
+        let Some(prev) = self.last_stack.take() else {
+            // Baseline: lines already on screen are not new.
+            self.last_stack = Some(stack.into_iter().map(|l| (l, true)).collect());
+            return;
+        };
+        let prev_lines: Vec<Line> = prev.iter().map(|(l, _)| *l).collect();
+        let alignment = align(&prev_lines, &stack, self.freshness_tolerance);
+        if alignment.overlap == 0 && !prev.is_empty() && !stack.is_empty() {
+            self.meso_possible_undercount = true;
+        }
+        let mut next = Vec::with_capacity(stack.len());
+        for (i, line) in stack.into_iter().enumerate() {
+            let mut counted = i < alignment.overlap && prev[alignment.shift + i].1;
+            if !counted && !line.is_unknown() {
                 match line.kind {
                     LineKind::Meso => self.meso_gained += line.amount,
                     LineKind::Exp | LineKind::PartyBonus => self.notification_exp += line.amount,
-                    LineKind::Other => {}
+                    LineKind::Other | LineKind::Unknown => {}
                 }
+                counted = true;
             }
+            next.push((line, counted));
         }
-        self.last_stack = Some(stack);
+        self.last_stack = Some(next);
     }
+
 }

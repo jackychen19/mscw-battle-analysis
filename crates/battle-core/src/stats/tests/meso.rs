@@ -124,3 +124,40 @@ fn stack_baseline_resets_on_resume() {
     sim.stack(&[meso(100, 210), meso(3, 255)]);
     assert_eq!(sim.snap().meso_gained, 3);
 }
+
+#[test]
+fn covered_line_is_counted_once_it_becomes_readable() {
+    let u = Line::new(LineKind::Unknown, 0, 0);
+    let mut sim = Sim::new();
+    sim.cmd(Command::Start);
+    sim.stack(&[meso(5, 200)]);
+    // A new line arrives under a monster…
+    sim.stack(&[meso(5, 190), u]);
+    assert_eq!(sim.snap().meso_gained, 0);
+    // …and is readable once the monster moves.
+    sim.stack(&[meso(5, 180), meso(30, 240)]);
+    sim.stack(&[meso(5, 170), meso(30, 230)]);
+    assert_eq!(sim.snap().meso_gained, 30);
+}
+
+#[test]
+fn line_covered_later_is_not_counted_again() {
+    let u = Line::new(LineKind::Unknown, 0, 0);
+    let mut sim = Sim::new();
+    sim.cmd(Command::Start);
+    sim.stack(&[]);
+    sim.stack(&[meso(30, 255)]);
+    sim.stack(&[u]);
+    sim.stack(&[meso(30, 230)]);
+    assert_eq!(sim.snap().meso_gained, 30);
+}
+
+#[test]
+fn unknown_line_already_on_screen_at_start_is_never_counted() {
+    let u = Line::new(LineKind::Unknown, 0, 0);
+    let mut sim = Sim::new();
+    sim.cmd(Command::Start);
+    sim.stack(&[u]);
+    sim.stack(&[meso(30, 230)]);
+    assert_eq!(sim.snap().meso_gained, 0);
+}
