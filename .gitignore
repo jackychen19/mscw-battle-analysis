@@ -1,0 +1,22 @@
+# OS / editor
+.DS_Store
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.sw?
+
+# Node / Vite
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+
+# Rust / Tauri
+target/
+src-tauri/gen/schemas
+
+# Never commit test footage, extracted frames, or debug crops
+fixtures/video/
+fixtures/frames/
+debug-captures/
