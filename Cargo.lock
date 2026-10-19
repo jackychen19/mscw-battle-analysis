@@ -105,6 +105,8 @@ name = "battle-analysis"
 version = "0.1.0"
 dependencies = [
  "battle-core",
+ "core-graphics",
+ "screencapturekit",
  "serde",
  "serde_json",
  "tauri",
@@ -2590,6 +2592,12 @@ name = "scopeguard"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
+
+[[package]]
+name = "screencapturekit"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8c26aa93dbf2f4edfc3646a9b9c4ab0d7acfb1b0e5938fe2d8d1d9a4e66b3502"
 
 [[package]]
 name = "selectors"

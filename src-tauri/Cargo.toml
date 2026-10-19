@@ -21,3 +21,9 @@ battle-core = { path = "../crates/battle-core" }
 tauri = { version = "2", features = ["macos-private-api"] }
 serde.workspace = true
 serde_json.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+# One-shot window screenshots of just the text regions (macOS 14+).
+screencapturekit = { version = "=2.1.0", features = ["macos_14_0"] }
+# Screen Recording permission check / request.
+core-graphics = "0.25"
