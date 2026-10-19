@@ -24,8 +24,6 @@ pub struct Snapshot {
     pub meso_per_min_recent: f64,
     /// Estimated time to next level at the recent rate.
     pub next_level_ms: Option<u64>,
-    /// EXP summed from `You received EXP` / party bonus lines (cross-check).
-    pub notification_exp: u64,
     /// Some level-up gain could not be computed (unknown level max).
     pub exp_approximate: bool,
     /// A burst may have pushed meso lines off screen between frames.

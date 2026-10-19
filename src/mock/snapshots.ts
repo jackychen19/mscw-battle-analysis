@@ -17,7 +17,6 @@ const base: Snapshot = {
   mesoPerMin: 0,
   mesoPerMinRecent: 0,
   nextLevelMs: null,
-  notificationExp: 0,
   expApproximate: false,
   mesoPossibleUndercount: false,
 };

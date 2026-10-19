@@ -24,7 +24,7 @@ Sections are self-contained; read only the one a task needs. Decisions made afte
 ## 3. Data sources
 
 1. **EXP (source of truth): the text above the EXP bar**, e.g. `EXP. 440,834 [38.43%]`, all one white color on a solid dark background. Crop only that text line, not the bar. Ignore the `EXP.` label. Also read the level number (bottom-left, `LV. 59`).
-2. **Mesos: the system notification stack in the bottom-right corner.** Lines read `You have gained mesos (+15)`. The newest line appears at the bottom; older lines move up and fade. This text sits directly over map art, so the background varies by map. Lines like `You received EXP (+78)` and `Bonus EXP for PARTY (+23)` also appear there. Parse them only as an optional cross-check, never as the EXP source.
+2. **Mesos: the system notification stack in the bottom-right corner.** Lines read `You have gained mesos (+15)`. The newest line appears at the bottom; older lines move up and fade. This text sits directly over map art, so the background varies by map. Lines like `You received EXP (+78)` and `Bonus EXP for PARTY (+23)` also appear there. **Decided:** only meso lines are counted; EXP comes from the EXP bar text alone. Other lines are recognised by their opening words (amount not read) so they can anchor stack alignment.
 
 ## 4. Reading text: template matching, not general OCR
 

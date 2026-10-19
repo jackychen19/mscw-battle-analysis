@@ -89,7 +89,6 @@ pub struct Session {
 
     exp_gained: u64,
     meso_gained: u64,
-    notification_exp: u64,
     exp_approximate: bool,
     meso_possible_undercount: bool,
 
@@ -114,7 +113,6 @@ impl Session {
             last_stack: None,
             exp_gained: 0,
             meso_gained: 0,
-            notification_exp: 0,
             exp_approximate: false,
             meso_possible_undercount: false,
             active_before_ms: 0,
@@ -216,7 +214,6 @@ impl Session {
             meso_per_min: per_min(self.meso_gained, duration_ms),
             meso_per_min_recent: meso_recent,
             next_level_ms,
-            notification_exp: self.notification_exp,
             exp_approximate: self.exp_approximate,
             meso_possible_undercount: self.meso_possible_undercount,
         }
@@ -301,10 +298,8 @@ impl Session {
         for (i, line) in stack.into_iter().enumerate() {
             let mut counted = i < alignment.overlap && prev[alignment.shift + i].1;
             if !counted && !line.is_unknown() {
-                match line.kind {
-                    LineKind::Meso => self.meso_gained += line.amount,
-                    LineKind::Exp | LineKind::PartyBonus => self.notification_exp += line.amount,
-                    LineKind::Other | LineKind::Unknown => {}
+                if line.kind == LineKind::Meso {
+                    self.meso_gained += line.amount;
                 }
                 counted = true;
             }

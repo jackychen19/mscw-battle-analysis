@@ -21,9 +21,10 @@ impl ExpReading {
 pub enum LineKind {
     /// `You have gained mesos (+15)`
     Meso,
-    /// `You received EXP (+78)` — cross-check only, never the EXP source.
+    /// `You received EXP (+78)`. Never counted: EXP comes from the EXP bar.
+    /// Only used to locate lines when aligning stacks.
     Exp,
-    /// `Bonus EXP for PARTY (+23)` — cross-check only.
+    /// `Bonus EXP for PARTY (+23)`. Never counted, like [`LineKind::Exp`].
     PartyBonus,
     /// Any other notification. Still takes part in stack alignment.
     Other,
@@ -37,8 +38,8 @@ pub enum LineKind {
 #[serde(rename_all = "camelCase")]
 pub struct Line {
     pub kind: LineKind,
-    /// The `(+N)` amount. For [`LineKind::Other`], a parser-supplied
-    /// fingerprint of the text so different lines don't compare equal.
+    /// The `(+N)` amount for [`LineKind::Meso`]. For other kinds, 0 or a
+    /// parser-supplied fingerprint so different lines don't compare equal.
     pub amount: u64,
     /// Text brightness, 255 = fully opaque. Lines only fade as they age, so a
     /// line that got brighter between frames must be a different line.

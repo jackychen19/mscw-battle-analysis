@@ -17,7 +17,6 @@ export interface Snapshot {
   mesoPerMin: number;
   mesoPerMinRecent: number;
   nextLevelMs: number | null;
-  notificationExp: number;
   expApproximate: boolean;
   mesoPossibleUndercount: boolean;
 }

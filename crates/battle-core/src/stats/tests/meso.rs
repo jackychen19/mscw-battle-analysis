@@ -67,14 +67,13 @@ fn single_frame_stack_misread_is_ignored() {
 }
 
 #[test]
-fn exp_notifications_are_cross_check_only() {
+fn only_meso_lines_are_counted() {
     let mut sim = Sim::new();
     sim.cmd(Command::Start);
     sim.stack(&[]);
-    sim.stack(&[Line::new(LineKind::Exp, 78, 255), Line::new(LineKind::PartyBonus, 23, 255), meso(15, 255)]);
+    sim.stack(&[Line::new(LineKind::Exp, 0, 255), Line::new(LineKind::PartyBonus, 0, 255), meso(15, 255)]);
     let s = sim.snap();
     assert_eq!(s.meso_gained, 15);
-    assert_eq!(s.notification_exp, 78 + 23);
     assert_eq!(s.exp_gained, 0);
 }
 
