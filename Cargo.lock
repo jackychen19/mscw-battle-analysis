@@ -115,6 +115,7 @@ dependencies = [
 name = "battle-core"
 version = "0.1.0"
 dependencies = [
+ "png 0.18.1",
  "serde",
  "serde_json",
 ]
