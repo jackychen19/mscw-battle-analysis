@@ -4,6 +4,9 @@
 
 use serde::{Deserialize, Serialize};
 
+mod learn;
+pub use learn::ExpFontLearner;
+
 use std::fmt;
 
 use crate::capture::{Frame, RectPt, WindowInfo};
