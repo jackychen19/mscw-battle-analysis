@@ -11,7 +11,7 @@ use crate::parse::{GlyphSet, GlyphTemplate, Gray, exp_line, similarity};
 /// digits of the bitmap font differ by a few pixels.
 const SAME_GLYPH: f32 = 0.97;
 /// Distinct samples needed before trusting a solution.
-const MIN_SAMPLES: usize = 4;
+pub const NEEDED_SAMPLES: usize = 4;
 /// Most recent distinct samples kept (a level-up breaks the ratio; old
 /// samples age out).
 const MAX_SAMPLES: usize = 24;
@@ -97,7 +97,7 @@ impl ExpFontLearner {
         // during learning changes the ratio).
         for skip in 0..self.samples.len() {
             let recent = &self.samples[skip..];
-            if recent.len() < MIN_SAMPLES {
+            if recent.len() < NEEDED_SAMPLES {
                 return None;
             }
             if let Some(chars) = solve_samples(recent, |g, close| self.looks_open(g, close)) {

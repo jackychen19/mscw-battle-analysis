@@ -5,9 +5,11 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use battle_core::calibration::{
-    Calibration, Missing, Regions, Sample, SampleError, WindowMatch, find_game_window, teach_sample,
+    Calibration, EXP_CHARS, ExpFontLearner, Missing, NEEDED_SAMPLES, Regions, Sample, SampleError, WindowMatch,
+    find_game_window, find_regions, missing_chars, teach_sample,
 };
 use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
+use battle_core::parse::ExpReader;
 use battle_core::stats::Observation;
 use serde::Serialize;
 
@@ -16,6 +18,12 @@ use crate::capture::{self, Permission};
 /// How often the window list is re-checked (window lost / reopened).
 const SCAN_EVERY: Duration = Duration::from_secs(2);
 const CALIBRATION_FILE: &str = "calibration.json";
+/// How often to look for the EXP text and level again while they're not found.
+const LOCATE_EVERY: Duration = Duration::from_secs(3);
+/// Fraction of the window, from the bottom, searched for the status bar.
+const STATUS_BAR_SHARE: f64 = 0.25;
+/// Distinct samples without a solution before the boxes are looked for again.
+const RELOCATE_AFTER: usize = 24;
 
 /// What the panel needs to know about capture.
 #[derive(Clone, Debug, Serialize)]
@@ -26,6 +34,26 @@ pub struct CaptureStatus {
     pub game: Option<String>,
     /// Calibrated for this window at its current scale.
     pub calibrated: bool,
+    /// Automatic calibration in progress (game found, not calibrated yet).
+    pub learning: Option<Learning>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Learning {
+    /// The EXP text and level were found on screen.
+    pub found: bool,
+    /// Distinct EXP readings seen so far, and how many a solution needs.
+    pub samples: usize,
+    pub needed: usize,
+}
+
+/// Calibrating by itself: find the boxes, then learn the EXP digits.
+#[derive(Default)]
+struct Auto {
+    regions: Option<Regions>,
+    learner: ExpFontLearner,
+    last_locate: Option<Instant>,
 }
 
 /// Result of a capture tick while recording.
@@ -43,6 +71,7 @@ pub struct Capturer {
     game: Option<WindowInfo>,
     permission: Permission,
     last_scan: Option<Instant>,
+    auto: Auto,
 }
 
 impl Capturer {
@@ -57,6 +86,7 @@ impl Capturer {
             game: None,
             permission: capture::permission(),
             last_scan: None,
+            auto: Auto::default(),
         }
     }
 
@@ -65,6 +95,11 @@ impl Capturer {
             permission: self.permission,
             game: self.game.as_ref().map(|g| g.title.clone()),
             calibrated: self.ready().is_some(),
+            learning: (self.game.is_some() && self.ready().is_none()).then(|| Learning {
+                found: self.auto.regions.is_some(),
+                samples: self.auto.learner.sample_count(),
+                needed: NEEDED_SAMPLES,
+            }),
         }
     }
 
@@ -79,7 +114,7 @@ impl Capturer {
     /// Calibration usable for the current game window.
     fn ready(&self) -> Option<&Calibration> {
         let game = self.game.as_ref()?;
-        self.calibration.as_ref().filter(|c| c.window.matches(game) && c.fits_scale(game.scale))
+        self.calibration.as_ref().filter(|c| c.fits(game))
     }
 
     /// Re-checks the window list if it's due (or `force`).
@@ -104,6 +139,10 @@ impl Capturer {
         };
         // Re-select when it's a different window or it moved to another display.
         if self.game.as_ref() != Some(&found) {
+            if self.game.as_ref().is_none_or(|g| g.id != found.id || g.bounds.w != found.bounds.w || g.bounds.h != found.bounds.h) {
+                // Another window, or resized: the boxes may have moved.
+                self.auto = Auto::default();
+            }
             self.game = self.source.select_window(found.id).map_err(|e| self.on_error(&e)).ok();
         }
     }
@@ -137,6 +176,72 @@ impl Capturer {
                 Some(if self.game.is_none() { Tick::WindowLost } else { Tick::Observed(Observation::Unreadable) })
             }
         }
+    }
+
+    /// Calibrates by itself, one step per call: finds the EXP text and level,
+    /// then learns the EXP digits from what the screen shows as EXP changes.
+    /// Keeps learning after calibrating until every character is known.
+    pub fn learn(&mut self) {
+        let Some(game) = self.game.clone() else { return };
+        let ready = self.ready().cloned();
+        if ready.as_ref().is_some_and(|c| c.missing().exp.is_empty()) {
+            return;
+        }
+        let regions = match ready.as_ref().map(|c| c.regions).or(self.auto.regions) {
+            Some(r) => r,
+            None => match self.locate(&game) {
+                Some(r) => r,
+                None => return,
+            },
+        };
+        let Ok(crop) = self.capture(regions.exp_text) else { return };
+        let before = self.auto.learner.sample_count();
+        if !self.auto.learner.add(&crop) || self.auto.learner.sample_count() == before {
+            return;
+        }
+        let Some(font) = self.auto.learner.solve() else {
+            if ready.is_none() && self.auto.learner.sample_count() >= RELOCATE_AFTER {
+                self.auto = Auto::default();
+            }
+            return;
+        };
+        let known = |set: &battle_core::parse::GlyphSet| EXP_CHARS.len() - missing_chars(set, EXP_CHARS).len();
+        if ready.as_ref().is_some_and(|c| known(&font) <= known(&c.exp.exp_glyphs)) {
+            return;
+        }
+        // No level templates: the level's blocky digits are read by shape.
+        let reader = ExpReader { exp_glyphs: font, ..ExpReader::default() };
+        let cal = Calibration::new(&game, regions, reader);
+        if save(&self.dir, &cal).is_ok() {
+            self.calibration = Some(cal);
+            self.chosen = Some(WindowMatch::of(&game));
+        }
+    }
+
+    /// Looks for the EXP text and level in the bottom of the window, if due.
+    /// Both must be found and the level must read.
+    fn locate(&mut self, game: &WindowInfo) -> Option<Regions> {
+        let now = Instant::now();
+        if self.auto.last_locate.is_some_and(|t| now - t < LOCATE_EVERY) {
+            return None;
+        }
+        self.auto.last_locate = Some(now);
+        let h = game.bounds.h * STATUS_BAR_SHARE;
+        let area = RectPt { x: 0.0, y: game.bounds.h - h, w: game.bounds.w, h };
+        // Snap to the pixel grid so found pixels convert back exactly.
+        let px = area.to_px(game.scale);
+        let area = RectPt {
+            x: f64::from(px.x) / game.scale,
+            y: f64::from(px.y) / game.scale,
+            w: f64::from(px.w) / game.scale,
+            h: f64::from(px.h) / game.scale,
+        };
+        let strip = self.capture(area).ok()?;
+        let regions = find_regions(&strip, area, game.scale)?;
+        let level = self.capture(regions.level).ok()?;
+        ExpReader::default().read_level(&level)?;
+        self.auto.regions = Some(regions);
+        Some(regions)
     }
 
     fn on_error(&mut self, e: &CaptureError) {
@@ -181,6 +286,7 @@ impl Capturer {
 
     pub fn reset(&mut self) -> Result<(), String> {
         self.calibration = None;
+        self.auto = Auto::default();
         match std::fs::remove_file(self.dir.join(CALIBRATION_FILE)) {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
             _ => Ok(()),

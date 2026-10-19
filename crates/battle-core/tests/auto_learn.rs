@@ -2,8 +2,8 @@
 
 mod common;
 
-use battle_core::calibration::{ExpFontLearner, find_exp_text, find_level};
-use battle_core::capture::RectPx;
+use battle_core::calibration::{ExpFontLearner, find_exp_text, find_level, find_regions};
+use battle_core::capture::{RectPt, RectPx};
 use battle_core::parse::ExpReader;
 use common::Fixture;
 
@@ -93,4 +93,18 @@ fn reads_the_level_by_shape_with_nothing_taught() {
     assert!(reads.iter().filter(|r| r.is_some()).count() >= 8, "{reads:?}");
     let bar = common::load_png(&common::fixtures_dir().join("grinding-01/bar-0465.png"));
     assert_eq!(reader.read_level(&bar.crop(find_level(&bar).unwrap())), Some(59));
+}
+
+#[test]
+fn regions_come_back_in_window_points() {
+    let bar = common::load_png(&common::fixtures_dir().join("grinding-01/bar-0465.png"));
+    // As if the strip were captured at 2x from y = 500 pt of the window.
+    let area = RectPt { x: 0.0, y: 500.0, w: f64::from(bar.width) / 2.0, h: f64::from(bar.height) / 2.0 };
+    let r = find_regions(&bar, area, 2.0).unwrap();
+    let px = find_exp_text(&bar).unwrap();
+    assert_eq!(r.exp_text.x, f64::from(px.x) / 2.0);
+    assert_eq!(r.exp_text.y, 500.0 + f64::from(px.y) / 2.0);
+    // Converting back at 2x gives the same pixels.
+    let back = RectPt { y: r.exp_text.y - 500.0, ..r.exp_text }.to_px(2.0);
+    assert_eq!(back, px);
 }

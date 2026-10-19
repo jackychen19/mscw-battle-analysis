@@ -45,7 +45,7 @@ impl AppState {
             session: Session::new(SessionConfig::default()),
             last_session: None,
             feed: mock.then(MockFeed::new),
-            capture: CaptureStatus { permission: capture::permission(), game: None, calibrated: false },
+            capture: CaptureStatus { permission: capture::permission(), game: None, calibrated: false, learning: None },
             auto_paused: false,
         }
     }

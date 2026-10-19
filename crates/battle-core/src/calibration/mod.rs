@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 
 mod learn;
 mod locate;
-pub use locate::{find_exp_text, find_level};
-pub use learn::ExpFontLearner;
+pub use locate::{find_exp_text, find_level, find_regions};
+pub use learn::{ExpFontLearner, NEEDED_SAMPLES};
 
 use std::fmt;
 
@@ -31,13 +31,30 @@ pub struct Calibration {
     pub window: WindowMatch,
     /// Scale factor the templates were captured at; they're only valid there.
     pub scale: f64,
+    /// Window size (points) the regions were found at; the status bar moves
+    /// when the window is resized.
+    #[serde(default)]
+    pub window_size: Option<[f64; 2]>,
     pub regions: Regions,
     pub exp: ExpReader,
 }
 
 impl Calibration {
     pub fn new(window: &WindowInfo, regions: Regions, exp: ExpReader) -> Self {
-        Self { version: CALIBRATION_VERSION, window: WindowMatch::of(window), scale: window.scale, regions, exp }
+        Self {
+            version: CALIBRATION_VERSION,
+            window: WindowMatch::of(window),
+            scale: window.scale,
+            window_size: Some([window.bounds.w, window.bounds.h]),
+            regions,
+            exp,
+        }
+    }
+
+    /// Made for this window at its current size and scale.
+    pub fn fits(&self, window: &WindowInfo) -> bool {
+        let same_size = self.window_size.is_none_or(|[w, h]| (w - window.bounds.w).abs() < 1.0 && (h - window.bounds.h).abs() < 1.0);
+        self.window.matches(window) && self.fits_scale(window.scale) && same_size
     }
 
     /// Templates match only at the scale they were learned at.
@@ -220,6 +237,9 @@ mod tests {
         assert_eq!(cal.missing(), Missing { exp: "125679".into(), level: "01234678".into() });
         assert!(cal.fits_scale(2.0));
         assert!(!cal.fits_scale(1.0));
+        let game = window(1, "MapleStory", "MapleStory", 1.0, 1.0);
+        assert!(cal.fits(&game));
+        assert!(!cal.fits(&WindowInfo { bounds: RectPt { w: 1366.0, ..game.bounds }, ..game }));
     }
 
     #[test]

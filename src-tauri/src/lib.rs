@@ -59,6 +59,7 @@ pub fn run() {
                     let (status, tick) = {
                         let mut cap = cap.lock().unwrap();
                         let tick = if recording { cap.tick() } else { cap.scan(false); None };
+                        cap.learn();
                         (cap.status(), tick)
                     };
                     state.lock().unwrap().on_capture(status, tick);

@@ -4,7 +4,8 @@
 
 use std::ops::Range;
 
-use crate::capture::{Frame, RectPx};
+use super::Regions;
+use crate::capture::{Frame, RectPt, RectPx};
 use crate::parse::{Channel, Gray, TextLine, exp_line, similarity};
 
 /// Pixels at least this bright can be the white text.
@@ -196,6 +197,18 @@ fn exp_in_word(frame: &Frame, area: RectPx, line: &TextLine, word: Range<usize>)
 fn mirror(g: &Gray) -> Gray {
     let (w, h) = (g.width(), g.height());
     Gray::new(w, h, (0..h).flat_map(|y| (0..w).rev().map(move |x| (x, y))).map(|(x, y)| g.get(x, y)).collect())
+}
+
+/// Both regions in `strip`, a capture of `area` (points, window-relative) at
+/// `scale`, converted back to window points.
+pub fn find_regions(strip: &Frame, area: RectPt, scale: f64) -> Option<Regions> {
+    let to_pt = |r: RectPx| RectPt {
+        x: area.x + f64::from(r.x) / scale,
+        y: area.y + f64::from(r.y) / scale,
+        w: f64::from(r.w) / scale,
+        h: f64::from(r.h) / scale,
+    };
+    Some(Regions { exp_text: to_pt(find_exp_text(strip)?), level: to_pt(find_level(strip)?) })
 }
 
 fn orange(p: [u8; 4]) -> bool {
