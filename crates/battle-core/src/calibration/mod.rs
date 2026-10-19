@@ -102,8 +102,12 @@ pub struct Regions {
     pub level: RectPt,
 }
 
+/// Smaller than this (points) is a launcher or dialog, not the game.
+const MIN_GAME_SIZE: (f64, f64) = (640.0, 360.0);
+
 /// The game window among `windows`: the saved one if it's open, otherwise the
-/// largest window whose app or title mentions MapleStory.
+/// largest window whose app or title mentions MapleStory (launchers and
+/// dialogs, which are small, are skipped).
 pub fn find_game_window<'a>(windows: &'a [WindowInfo], saved: Option<&WindowMatch>) -> Option<&'a WindowInfo> {
     let largest = |it: &mut dyn Iterator<Item = &'a WindowInfo>| {
         it.max_by(|a, b| (a.bounds.w * a.bounds.h).total_cmp(&(b.bounds.w * b.bounds.h)))
@@ -114,7 +118,8 @@ pub fn find_game_window<'a>(windows: &'a [WindowInfo], saved: Option<&WindowMatc
         return Some(w);
     }
     let maple = |s: &str| s.to_lowercase().contains("maplestory");
-    largest(&mut windows.iter().filter(|w| maple(&w.owner) || maple(&w.title)))
+    let big = |w: &WindowInfo| w.bounds.w >= MIN_GAME_SIZE.0 && w.bounds.h >= MIN_GAME_SIZE.1;
+    largest(&mut windows.iter().filter(|w| (maple(&w.owner) || maple(&w.title)) && big(w)))
 }
 
 /// The characters of `chars` that `set` has no template for.
@@ -225,6 +230,9 @@ mod tests {
         assert_eq!(find_game_window(&windows, Some(&gone)).map(|w| w.id), Some(2));
         assert_eq!(find_game_window(&windows, None).map(|w| w.id), Some(2));
         assert_eq!(find_game_window(&windows[2..], None), None);
+        // The Nexon Launcher is titled MapleStory too, but small.
+        let launcher = [window(4, "Nexon Launcher", "MapleStory", 800.0, 300.0)];
+        assert_eq!(find_game_window(&launcher, None), None);
     }
 
     #[test]

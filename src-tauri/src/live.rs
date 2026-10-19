@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use battle_core::calibration::{
     Calibration, EXP_CHARS, ExpFontLearner, Missing, NEEDED_SAMPLES, Regions, Sample, SampleError, WindowMatch,
-    find_game_window, find_regions, missing_chars, teach_sample,
+    find_exp_text, find_game_window, find_level, find_regions, missing_chars, teach_sample,
 };
 use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
 use battle_core::parse::ExpReader;
@@ -236,10 +236,26 @@ impl Capturer {
             w: f64::from(px.w) / game.scale,
             h: f64::from(px.h) / game.scale,
         };
-        let strip = self.capture(area).ok()?;
+        let strip = match self.capture(area) {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[locate] capture of {area:?} failed: {e}");
+                return None;
+            }
+        };
+        let (exp, lvl) = (find_exp_text(&strip), find_level(&strip));
+        if exp.is_none() || lvl.is_none() {
+            save_debug_crop("locate-strip", &strip);
+        }
+        eprintln!(
+            "[locate] window {}x{} pt @{}x, strip {}x{} px: exp {exp:?}, level {lvl:?}",
+            game.bounds.w, game.bounds.h, game.scale, strip.width, strip.height
+        );
         let regions = find_regions(&strip, area, game.scale)?;
         let level = self.capture(regions.level).ok()?;
-        ExpReader::default().read_level(&level)?;
+        let read = ExpReader::default().read_level(&level);
+        eprintln!("[locate] level reads {read:?}");
+        read?;
         self.auto.regions = Some(regions);
         Some(regions)
     }
@@ -291,6 +307,26 @@ impl Capturer {
             Err(e) if e.kind() != std::io::ErrorKind::NotFound => Err(e.to_string()),
             _ => Ok(()),
         }
+    }
+}
+
+/// Off unless `BATTLE_DEBUG_CAPTURES=1`: saves a crop (never a full frame) to
+/// `debug-captures/<name>-<w>x<h>.rgba` as raw RGBA, once per name and size.
+fn save_debug_crop(name: &str, crop: &Frame) {
+    if std::env::var_os("BATTLE_DEBUG_CAPTURES").is_none_or(|v| v != "1") {
+        return;
+    }
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../debug-captures");
+    let path = dir.join(format!("{name}-{}x{}.rgba", crop.width, crop.height));
+    if path.exists() {
+        return;
+    }
+    let mut rgba = Vec::with_capacity((crop.width * crop.height * 4) as usize);
+    for y in 0..crop.height as usize {
+        rgba.extend_from_slice(&crop.rgba[y * crop.stride..y * crop.stride + crop.width as usize * 4]);
+    }
+    if std::fs::create_dir_all(&dir).and_then(|()| std::fs::write(&path, rgba)).is_ok() {
+        eprintln!("[debug] saved {}", path.display());
     }
 }
 
