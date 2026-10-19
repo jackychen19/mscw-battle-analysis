@@ -69,6 +69,20 @@ impl ExpFontLearner {
         self.samples.len()
     }
 
+    /// For diagnostics: the glyph groups of each sample and why the samples
+    /// do or don't solve.
+    pub fn describe(&self) -> String {
+        let mut out = format!("{} glyph groups\n", self.groups.len());
+        for s in &self.samples {
+            out += &format!("  {s:?}\n");
+        }
+        match solve_explained(&self.samples, |g, close| self.looks_open(g, close)) {
+            Ok(chars) => out += &format!("solves: {chars:?}"),
+            Err(why) => out += &format!("doesn't solve: {why}"),
+        }
+        out
+    }
+
     fn group_of(&mut self, glyph: Gray) -> usize {
         let best = self
             .groups
@@ -141,8 +155,17 @@ pub(super) fn last_word(glyphs: &[std::ops::Range<u32>]) -> std::ops::Range<usiz
 /// Group → character for punctuation and digits, if exactly one digit
 /// assignment fits all samples.
 fn solve_samples(samples: &[Vec<usize>], looks_open: impl Fn(usize, usize) -> f32) -> Option<Vec<(usize, char)>> {
-    let layout = Layout::find(samples, looks_open)?;
-    let parsed: Vec<Sample> = samples.iter().map(|s| layout.parse(s)).collect::<Option<_>>()?;
+    solve_explained(samples, looks_open).ok()
+}
+
+/// [`solve_samples`], saying why when there's no answer.
+fn solve_explained(samples: &[Vec<usize>], looks_open: impl Fn(usize, usize) -> f32) -> Result<Vec<(usize, char)>, String> {
+    let layout = Layout::find(samples, looks_open).ok_or("no consistent `]`, `%`, `.`, `[` positions")?;
+    let parsed: Vec<Sample> = samples
+        .iter()
+        .enumerate()
+        .map(|(i, s)| layout.parse(s).ok_or(format!("sample {i} doesn't fit the layout {layout:?}")))
+        .collect::<Result<_, _>>()?;
 
     // Digit groups in order of significance in the first samples, so the
     // search fixes the leading digits (the most constrained) first.
@@ -155,7 +178,7 @@ fn solve_samples(samples: &[Vec<usize>], looks_open: impl Fn(usize, usize) -> f3
         }
     }
     if digits.len() > 10 {
-        return None;
+        return Err(format!("{} digit groups (a digit split into several)", digits.len()));
     }
     // After assigning digits[..=k], these samples are fully known.
     let mut complete_at: Vec<Vec<usize>> = vec![Vec::new(); digits.len()];
@@ -166,23 +189,26 @@ fn solve_samples(samples: &[Vec<usize>], looks_open: impl Fn(usize, usize) -> f3
             .zip(&s.slots)
             .filter(|(_, slot)| **slot == Slot::Digit)
             .map(|(g, _)| digits.iter().position(|d| d == g).unwrap())
-            .max()?;
+            .max()
+            .ok_or("a sample with no digits")?;
         complete_at[last].push(si);
     }
 
     let mut search = Search { parsed: &parsed, digits: &digits, complete_at: &complete_at, value: vec![None; digits.len()], solutions: Vec::new(), steps: 0 };
     search.run(0, (0.0, f64::INFINITY));
     if search.steps >= SEARCH_BUDGET {
-        return None;
+        return Err(format!("search gave up ({} digit groups)", digits.len()));
     }
-    let [solution] = search.solutions.as_slice() else { return None };
+    let [solution] = search.solutions.as_slice() else {
+        return Err(format!("{} digit assignments fit (need exactly one)", search.solutions.len()));
+    };
 
     let mut chars: Vec<(usize, char)> = digits.iter().zip(solution).map(|(&g, &d)| (g, char::from(b'0' + d))).collect();
     chars.extend([(layout.close, ']'), (layout.percent, '%'), (layout.dot, '.'), (layout.open, '[')]);
     if let Some(c) = layout.comma {
         chars.push((c, ','));
     }
-    Some(chars)
+    Ok(chars)
 }
 
 /// Which group is each punctuation mark, from where marks must sit.
