@@ -4,7 +4,7 @@ use std::ops::Range;
 use serde::{Deserialize, Serialize};
 
 use super::bitmap::Bitmap;
-use super::segment::column_runs;
+use super::line::TextLine;
 
 /// Default minimum match score (intersection over union) for a glyph.
 pub const DEFAULT_MIN_SCORE: f32 = 0.7;
@@ -54,32 +54,25 @@ pub struct LineRead {
     pub score: f32,
 }
 
-/// Crops a bitmap to the rows that contain ink: the band that teaching and
-/// reading both work in.
-pub fn line_band(b: &Bitmap) -> Option<Bitmap> {
-    let rows = b.ink_rows()?;
-    Some(b.crop(0, rows.start, b.width(), rows.end - rows.start))
-}
-
 impl GlyphSet {
-    /// Learns templates from `line` (a single text line) showing `text`.
-    /// Spaces in `text` are ignored. If the line has more glyphs than `text`
-    /// has characters, the extra ones on the left are skipped (a label like
-    /// `EXP.`). Returns the column where the taught text starts.
-    pub fn teach(&mut self, line: &Bitmap, text: &str) -> Result<u32, TeachError> {
+    /// Learns templates from `line` showing `text`. Spaces in `text` are
+    /// ignored. If the line has more glyphs than `text` has characters, the
+    /// extra ones on the left are skipped (a label like `EXP.`). Returns the
+    /// column where the taught text starts.
+    pub fn teach(&mut self, line: &TextLine, text: &str) -> Result<u32, TeachError> {
         let chars: Vec<char> = text.chars().filter(|c| !c.is_whitespace()).collect();
-        let runs = column_runs(line);
-        if runs.is_empty() {
+        let found = line.glyphs.len();
+        if found == 0 {
             return Err(TeachError::NoInk);
         }
-        if runs.len() < chars.len() {
-            return Err(TeachError::GlyphCount { expected: chars.len(), found: runs.len() });
+        if found < chars.len() {
+            return Err(TeachError::GlyphCount { expected: chars.len(), found });
         }
-        let runs = &runs[runs.len() - chars.len()..];
-        for (&ch, run) in chars.iter().zip(runs) {
-            self.add(GlyphTemplate { ch, bitmap: line.crop_columns(run.clone()) });
+        let first = found - chars.len();
+        for (i, &ch) in chars.iter().enumerate() {
+            self.add(GlyphTemplate { ch, bitmap: line.glyph(first + i) });
         }
-        Ok(runs[0].start)
+        Ok(line.glyphs[first].start)
     }
 
     pub fn add(&mut self, t: GlyphTemplate) {
@@ -95,11 +88,11 @@ impl GlyphSet {
 
     /// Reads `line` left to right. `None` if any glyph matches no template
     /// with at least `min_score`.
-    pub fn read(&self, line: &Bitmap, min_score: f32) -> Option<LineRead> {
+    pub fn read(&self, line: &TextLine, min_score: f32) -> Option<LineRead> {
         let max_width = self.glyphs.iter().map(|g| g.bitmap.width()).max()?;
         let mut out = LineRead { text: String::new(), spans: Vec::new(), score: 1.0 };
-        for run in column_runs(line) {
-            let piece = line.crop_columns(run.clone());
+        for run in line.glyphs.iter().cloned() {
+            let piece = line.bitmap.crop_columns(run.clone());
             let single = self.best_match(&piece).filter(|&(_, s)| s >= min_score);
             match single {
                 Some((ch, score)) if piece.width() <= max_width + 1 => {
@@ -198,7 +191,12 @@ fn in_bounds(b: &Bitmap, x: i32, y: i32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::test_font::render;
+    use crate::parse::segment::column_runs;
+    use crate::parse::test_font;
+
+    fn render(text: &str, gap: u32) -> TextLine {
+        TextLine::from_bitmap(test_font::render(text, gap)).unwrap()
+    }
 
     const SAMPLE: &str = "0123456789,.[]%";
 
@@ -217,7 +215,8 @@ mod tests {
         assert_eq!(read.text, "440,834[38.43%]");
         assert_eq!(read.score, 1.0);
         assert_eq!(read.spans.len(), 15);
-        assert_eq!(render(SAMPLE, 1).width(), set.read(&render(SAMPLE, 1), DEFAULT_MIN_SCORE).unwrap().spans.last().unwrap().end);
+        let sample = render(SAMPLE, 1);
+        assert_eq!(sample.bitmap.width(), set.read(&sample, DEFAULT_MIN_SCORE).unwrap().spans.last().unwrap().end);
     }
 
     #[test]
@@ -230,7 +229,7 @@ mod tests {
     fn merged_glyphs_are_split() {
         let set = taught();
         let line = render("38.43", 0); // no gaps: one run
-        assert_eq!(column_runs(&line).len(), 1);
+        assert_eq!(column_runs(&line.bitmap).len(), 1);
         assert_eq!(set.read(&line, DEFAULT_MIN_SCORE).unwrap().text, "38.43");
     }
 
@@ -238,7 +237,7 @@ mod tests {
     fn tolerates_a_flipped_pixel() {
         let set = taught();
         let mut line = render("905", 1);
-        line.set(1, 1, !line.get(1, 1));
+        line.bitmap.set(1, 1, !line.bitmap.get(1, 1));
         assert_eq!(set.read(&line, DEFAULT_MIN_SCORE).unwrap().text, "905");
     }
 
@@ -253,14 +252,15 @@ mod tests {
         let mut set = GlyphSet::default();
         let line = render("EXP.12", 1);
         let start = set.teach(&line, "1 2").unwrap();
-        assert_eq!(start, render("EXP.", 1).width() + 1);
+        assert_eq!(start, test_font::render("EXP.", 1).width() + 1);
         assert_eq!(set.glyphs.iter().map(|g| g.ch).collect::<String>(), "12");
     }
 
     #[test]
     fn teach_errors() {
         let mut set = GlyphSet::default();
-        assert_eq!(set.teach(&Bitmap::new(5, 5), "1"), Err(TeachError::NoInk));
+        let empty = TextLine { bitmap: Bitmap::new(5, 5), glyphs: vec![] };
+        assert_eq!(set.teach(&empty, "1"), Err(TeachError::NoInk));
         assert_eq!(set.teach(&render("12", 1), "123"), Err(TeachError::GlyphCount { expected: 3, found: 2 }));
     }
 

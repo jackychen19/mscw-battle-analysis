@@ -86,17 +86,31 @@ impl Gray {
         b
     }
 
+    pub fn max(&self) -> u8 {
+        self.data.iter().copied().max().unwrap_or(0)
+    }
+
     /// Otsu's threshold: the split that best separates dark background from
     /// bright text. Works per crop, so it adapts to each region's background.
+    /// When a range of thresholds separates equally well (an empty stretch of
+    /// the histogram), the middle of that range is used.
     pub fn otsu_threshold(&self) -> u8 {
+        self.otsu_threshold_above(0)
+    }
+
+    /// Otsu's threshold among pixels brighter than `floor` only. Running it
+    /// above a first Otsu split separates the brightest class from a mid-tone
+    /// one, e.g. white digits from the orange tiles behind them. Returns
+    /// `floor` when those pixels are all one tone (nothing to split).
+    pub fn otsu_threshold_above(&self, floor: u8) -> u8 {
         let mut hist = [0u64; 256];
-        for &v in &self.data {
+        for &v in self.data.iter().filter(|&&v| v > floor || floor == 0) {
             hist[v as usize] += 1;
         }
-        let total = self.data.len() as f64;
+        let total: f64 = hist.iter().sum::<u64>() as f64;
         let sum_all: f64 = hist.iter().enumerate().map(|(i, &n)| i as f64 * n as f64).sum();
         let (mut weight_bg, mut sum_bg) = (0.0, 0.0);
-        let (mut best, mut best_var) = (0u8, -1.0);
+        let (mut best, mut best_end, mut best_var) = (0u8, 0u8, -1.0);
         for (t, &n) in hist.iter().enumerate() {
             weight_bg += n as f64;
             sum_bg += t as f64 * n as f64;
@@ -107,12 +121,18 @@ impl Gray {
             let mean_bg = sum_bg / weight_bg;
             let mean_fg = (sum_all - sum_bg) / weight_fg;
             let var = weight_bg * weight_fg * (mean_bg - mean_fg).powi(2);
-            if var > best_var {
+            if var > best_var * (1.0 + 1e-9) {
                 best_var = var;
                 best = t as u8;
+                best_end = t as u8;
+            } else if var >= best_var * (1.0 - 1e-9) && best_end as usize + 1 == t {
+                best_end = t as u8;
             }
         }
-        best
+        if best_var <= 0.0 {
+            return floor;
+        }
+        best + (best_end - best) / 2
     }
 
     /// Mean brightness of the pixels that are ink in `mask`, 0 if none.
@@ -145,6 +165,17 @@ mod tests {
         assert_eq!(g.get(1, 0), 220);
         let t = g.otsu_threshold();
         assert!((30..120).contains(&t), "threshold {t}");
+        // Three tones in level-crop proportions: mostly background, then
+        // orange tile, then white digit strokes.
+        let data = [vec![10; 20], vec![100; 8], vec![230; 3]].concat();
+        let three = Gray::new(31, 1, data);
+        let first = three.otsu_threshold();
+        let second = three.otsu_threshold_above(first);
+        assert!((10..100).contains(&first) && (100..230).contains(&second), "{first} {second}");
+        assert_eq!(Gray::new(2, 1, vec![10, 200]).otsu_threshold_above(100), 100);
+        // Two clusters (30, 220): the middle of the empty stretch between them.
+        let two = Gray::new(4, 1, vec![30, 30, 220, 220]);
+        assert_eq!(two.otsu_threshold(), 30 + (219 - 30) / 2);
         assert_eq!(g.binarize(t).to_ascii(), vec![".##.", "..#."]);
         assert_eq!(g.binarize(150).to_ascii(), vec![".##.", "...."]);
         assert_eq!(g.crop(RectPx { x: 1, y: 0, w: 9, h: 1 }).width(), 3);

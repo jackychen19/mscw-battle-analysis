@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use super::bitmap::Bitmap;
-use super::glyph::{DEFAULT_MIN_SCORE, GlyphSet, TeachError, line_band};
+use super::glyph::{DEFAULT_MIN_SCORE, GlyphSet, TeachError};
 use super::gray::{Channel, Gray};
+use super::line::TextLine;
 use crate::capture::Frame;
 use crate::stats::ExpReading;
 
@@ -27,14 +27,14 @@ impl ExpReader {
     /// Returns the column where the number starts (anything left of it, like
     /// the `EXP.` label, should be cropped off from then on).
     pub fn teach_exp(&mut self, crop: &Frame, exp: u64, pct_hundredths: u32) -> Result<u32, TeachError> {
-        let band = line_band(&binarize(crop, EXP_CHANNEL)).ok_or(TeachError::NoInk)?;
-        self.exp_glyphs.teach(&band, &format_exp_text(exp, pct_hundredths))
+        let line = exp_line(crop).ok_or(TeachError::NoInk)?;
+        self.exp_glyphs.teach(&line, &format_exp_text(exp, pct_hundredths))
     }
 
     /// Calibration: the level crop currently shows `level`.
     pub fn teach_level(&mut self, crop: &Frame, level: u32) -> Result<u32, TeachError> {
-        let band = line_band(&binarize(crop, LEVEL_CHANNEL)).ok_or(TeachError::NoInk)?;
-        self.level_glyphs.teach(&band, &level.to_string())
+        let line = level_line(crop).ok_or(TeachError::NoInk)?;
+        self.level_glyphs.teach(&line, &level.to_string())
     }
 
     /// `None` when the crop can't be read confidently (menus, tooltips,
@@ -46,24 +46,27 @@ impl ExpReader {
     }
 
     pub fn read_exp(&self, crop: &Frame) -> Option<(u64, u32)> {
-        let band = line_band(&binarize(crop, EXP_CHANNEL))?;
-        parse_exp_text(&self.exp_glyphs.read(&band, self.min_score)?.text)
+        let line = exp_line(crop)?;
+        parse_exp_text(&self.exp_glyphs.read(&line, self.min_score)?.text)
     }
 
     pub fn read_level(&self, crop: &Frame) -> Option<u32> {
-        let band = line_band(&binarize(crop, LEVEL_CHANNEL))?;
-        parse_level_text(&self.level_glyphs.read(&band, self.min_score)?.text)
+        let line = level_line(crop)?;
+        parse_level_text(&self.level_glyphs.read(&line, self.min_score)?.text)
     }
 }
 
 /// White digits with yellow-green brackets on a dark bar.
-const EXP_CHANNEL: Channel = Channel::Luma;
-/// White digits on orange tiles.
-const LEVEL_CHANNEL: Channel = Channel::Min;
+pub fn exp_line(crop: &Frame) -> Option<TextLine> {
+    TextLine::from_gray(&Gray::from_frame(crop, Channel::Luma))
+}
 
-fn binarize(crop: &Frame, channel: Channel) -> Bitmap {
-    let gray = Gray::from_frame(crop, channel);
-    gray.binarize(gray.otsu_threshold())
+/// White digits on orange tiles over a dark bar: three tones, so threshold
+/// twice to keep only the brightest (the digits).
+pub fn level_line(crop: &Frame) -> Option<TextLine> {
+    let gray = Gray::from_frame(crop, Channel::Min);
+    let t = gray.otsu_threshold_above(gray.otsu_threshold());
+    TextLine::from_gray_at(&gray, t)
 }
 
 /// `440834, 3843` → `440,834[38.43%]`, as the game draws it (without spaces).
