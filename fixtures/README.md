@@ -1,16 +1,37 @@
 # Fixtures
 
-Real game screenshots used by the parser tests (Milestone 2). Tests run with no game running.
+Real game footage used by the parser tests. Tests run with no game running.
 
-- `*.png`: committed crops of real frames (EXP text region, notification region).
-- `*.json`: expected values for the PNG with the same name, for example:
+## Committed: `<recording>/NNNN.*`
+
+One set per recording, named after the frame number at 5 fps (frame N is at (N−1)/5 s):
+
+- `NNNN.exp.png`, `NNNN.level.png`, `NNNN.notif.png`: crops of the EXP text, level digits and notification area.
+- `NNNN.json`: expected values, confirmed by a person.
 
 ```json
-{ "level": 59, "exp": 440834, "pctHundredths": 3843 }
+{
+  "source": "grinding-01",
+  "frame": 465,
+  "timeS": 92.8,
+  "exp": { "level": 59, "exp": 422579, "pctHundredths": 3684 },
+  "notifications": [
+    { "kind": "meso", "amount": 15, "faded": true },
+    { "kind": "exp", "amount": 8 },
+    { "kind": "partyBonus", "amount": 2 },
+    { "kind": "other", "text": "Jr. Necki Skin x1 earned. (Etc)" },
+    { "kind": "unreadable", "note": "faded and covered by a monster" }
+  ]
+}
 ```
 
-```json
-{ "lines": [{ "kind": "meso", "amount": 15 }, { "kind": "exp", "amount": 78 }] }
-```
+Notification lines are listed top to bottom.
 
-**Never committed** (gitignored): `video/` (gameplay recordings) and `frames/` (frames extracted from them).
+### grinding-01
+
+A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, Sleepy Dungeon), so the text is scaled by a non-integer factor and video-compressed: a harder case than a native capture. Only 0–122 s is used; after that the browser window moves.
+
+## Never committed (gitignored)
+
+- `video/`: gameplay recordings.
+- `frames/`: crops extracted from them by `scripts/extract-crops.sh`. Tests that need these skip when they're missing.

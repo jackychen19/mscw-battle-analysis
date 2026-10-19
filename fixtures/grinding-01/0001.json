@@ -1,0 +1,37 @@
+{
+  "source": "grinding-01",
+  "frame": 1,
+  "timeS": 0.0,
+  "exp": {
+    "level": 59,
+    "exp": 417750,
+    "pctHundredths": 3642
+  },
+  "notifications": [
+    {
+      "kind": "unreadable",
+      "note": "mesos line, faded and covered by a monster"
+    },
+    {
+      "kind": "meso",
+      "amount": 25,
+      "faded": true
+    },
+    {
+      "kind": "exp",
+      "amount": 13
+    },
+    {
+      "kind": "partyBonus",
+      "amount": 4
+    },
+    {
+      "kind": "other",
+      "text": "Jr. Necki Skin x1 earned. (Etc)"
+    },
+    {
+      "kind": "meso",
+      "amount": 17
+    }
+  ]
+}

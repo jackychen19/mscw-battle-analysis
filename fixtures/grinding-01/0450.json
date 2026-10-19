@@ -1,0 +1,32 @@
+{
+  "source": "grinding-01",
+  "frame": 450,
+  "timeS": 89.8,
+  "exp": {
+    "level": 59,
+    "exp": 422518,
+    "pctHundredths": 3683
+  },
+  "notifications": [
+    {
+      "kind": "unreadable",
+      "note": "mesos line, very faded and covered"
+    },
+    {
+      "kind": "exp",
+      "amount": 78
+    },
+    {
+      "kind": "partyBonus",
+      "amount": 23
+    },
+    {
+      "kind": "meso",
+      "amount": 16
+    },
+    {
+      "kind": "meso",
+      "amount": 13
+    }
+  ]
+}

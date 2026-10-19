@@ -1,0 +1,37 @@
+{
+  "source": "grinding-01",
+  "frame": 114,
+  "timeS": 22.6,
+  "exp": {
+    "level": 59,
+    "exp": 418876,
+    "pctHundredths": 3652
+  },
+  "notifications": [
+    {
+      "kind": "exp",
+      "amount": 15,
+      "note": "end partly covered"
+    },
+    {
+      "kind": "partyBonus",
+      "amount": 5
+    },
+    {
+      "kind": "exp",
+      "amount": 39
+    },
+    {
+      "kind": "partyBonus",
+      "amount": 12
+    },
+    {
+      "kind": "exp",
+      "amount": 13
+    },
+    {
+      "kind": "partyBonus",
+      "amount": 4
+    }
+  ]
+}
