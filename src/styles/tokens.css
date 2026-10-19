@@ -1,0 +1,22 @@
+:root {
+  --panel-bg: #2b3139;
+  --panel-border: #8c939c;
+  --inset-bg: #1c2127;
+  --inset-line: #2f363f;
+  --text: #ffffff;
+  --value: #ffd23f;
+  --muted: #8f98a3;
+
+  --green: #6fa52e;
+  --start: #79b534;
+  --start-dark: #4f7d1d;
+  --stop: #e0662a;
+  --stop-dark: #9e3f12;
+  --orange: #e07a24;
+  --gray-btn: #6b737d;
+  --rec: #d63a3a;
+  --progress: #8fd14f;
+
+  --radius: 12px;
+  --font: "Nunito", system-ui, sans-serif;
+}
