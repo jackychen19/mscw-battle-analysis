@@ -75,7 +75,9 @@ Prerequisites: macOS with Xcode Command Line Tools, [Rust](https://rustup.rs) (s
 npm install
 npm run tauri dev        # run the app (drives the real stats engine from a mock feed in M1)
 npm run dev              # UI only, in a browser, with mock data; ?mock=idle|recording|paused|stopped|empty
-cargo test -p battle-core   # stats engine + core tests
+npm run lint             # ESLint (fails on warnings)
+npm run typecheck        # TypeScript
+cargo test               # Rust tests (stats engine and core)
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
@@ -85,6 +87,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 crates/battle-core/   Pure Rust, no OS or I/O: stats engine, parser, calibration types, FrameSource trait
 src-tauri/            Tauri app: commands, OS-specific capture and floating-window implementations
 src/                  React + TypeScript panel
+docs/design/          Panel mockups (*.dc.html); their inline styles define the panel's look
 fixtures/             Committed test screenshots + expected values (video/ and frames/ are gitignored)
 ```
 
