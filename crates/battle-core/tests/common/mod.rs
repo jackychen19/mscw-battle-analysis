@@ -7,6 +7,8 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use battle_core::capture::Frame;
+use battle_core::parse::{NoticeReader, StackLayout};
+use battle_core::stats::LineKind;
 use serde_json::Value;
 
 pub fn fixtures_dir() -> PathBuf {
@@ -61,4 +63,41 @@ pub fn load_png(path: &Path) -> Frame {
         other => panic!("unsupported png colour type {other:?}"),
     };
     Frame { width: info.width, height: info.height, stride: info.width as usize * 4, rgba }
+}
+
+/// Measured on grinding-01's notification crop.
+pub const NOTICE_LAYOUT: StackLayout = StackLayout { bottom_top: 229.0, line_height: 18, pitch: 28.0, right: 504 };
+/// Frames used for calibration; 380, 450 and 600 are held out.
+const NOTICE_TEACH: [u32; 7] = [465, 151, 29, 300, 114, 1, 490];
+
+/// A fixture notification line's kind, if it has one the reader knows.
+pub fn kind(l: &Value) -> Option<LineKind> {
+    match l["kind"].as_str()? {
+        "meso" => Some(LineKind::Meso),
+        "exp" => Some(LineKind::Exp),
+        "partyBonus" => Some(LineKind::PartyBonus),
+        _ => None,
+    }
+}
+
+/// Not faded or annotated: clear enough to teach from and must be read.
+pub fn clean(l: &Value) -> bool {
+    l.get("faded").is_none() && l.get("note").is_none()
+}
+
+/// The notification reader taught from [`NOTICE_TEACH`].
+pub fn notice_reader() -> NoticeReader {
+    let mut reader = NoticeReader::new(NOTICE_LAYOUT);
+    for frame in NOTICE_TEACH {
+        let f = Fixture::load("grinding-01", frame);
+        let lines: Vec<Option<(LineKind, u64)>> = f.expected["notifications"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .rev()
+            .map(|l| clean(l).then(|| Some((kind(l)?, l["amount"].as_u64()?))).flatten())
+            .collect();
+        reader.teach(&f.crop("notif"), &lines).unwrap_or_else(|e| panic!("teach {frame}: {e}"));
+    }
+    reader
 }
