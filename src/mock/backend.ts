@@ -78,6 +78,7 @@ const mockWindow: WindowInfo = {
   owner: "MapleStory",
   bounds: { x: 0, y: 0, w: 800, h: 600 },
   scale: 2,
+  onScreen: true,
 };
 let mockRegions: Regions | null = null;
 let mockMissing: Missing | null = null;

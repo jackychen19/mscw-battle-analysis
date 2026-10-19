@@ -39,8 +39,8 @@ impl MacFrameSource {
             .get()
             .map_err(map_err)?;
         // Off-screen windows count too: a fullscreen game sits in its own Space.
-        // Layer 0 = ordinary app windows (no menu bar, dock, overlays).
-        Ok(content.windows().into_iter().filter(|w| w.window_layer() == 0).collect())
+        // Any window level: MapleStory Classic World's window sits at level 26.
+        Ok(content.windows())
     }
 
     fn window_filter(w: &SCWindow) -> SCContentFilter {
@@ -55,6 +55,7 @@ impl MacFrameSource {
             owner: w.owning_application().map(|a| a.application_name()).unwrap_or_default(),
             bounds: RectPt { x: f.x, y: f.y, w: f.width, h: f.height },
             scale: f64::from(filter.point_pixel_scale()),
+            on_screen: w.is_on_screen(),
         }
     }
 }
@@ -63,7 +64,9 @@ impl FrameSource for MacFrameSource {
     fn list_windows(&mut self) -> Result<Vec<WindowInfo>, CaptureError> {
         let mut out = Vec::new();
         for w in Self::shareable_windows()? {
-            if w.title().is_none_or(|t| t.is_empty()) {
+            // Untitled or tiny: menu bar strips, helper windows.
+            let f = w.frame();
+            if w.title().is_none_or(|t| t.is_empty()) || f.width < 50.0 || f.height < 50.0 {
                 continue;
             }
             out.push(Self::info(&w, &Self::window_filter(&w)));

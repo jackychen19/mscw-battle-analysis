@@ -105,21 +105,22 @@ pub struct Regions {
 /// Smaller than this (points) is a launcher or dialog, not the game.
 const MIN_GAME_SIZE: (f64, f64) = (640.0, 360.0);
 
-/// The game window among `windows`: the saved one if it's open, otherwise the
-/// largest window whose app or title mentions MapleStory (launchers and
-/// dialogs, which are small, are skipped).
+/// The game window among `windows`: the saved one if it's open, otherwise a
+/// window whose app or title mentions MapleStory. Launchers (the Nexon
+/// launcher has several, one screen-sized and hidden) and small dialogs are
+/// skipped; visible windows beat hidden ones, then larger beats smaller.
 pub fn find_game_window<'a>(windows: &'a [WindowInfo], saved: Option<&WindowMatch>) -> Option<&'a WindowInfo> {
-    let largest = |it: &mut dyn Iterator<Item = &'a WindowInfo>| {
-        it.max_by(|a, b| (a.bounds.w * a.bounds.h).total_cmp(&(b.bounds.w * b.bounds.h)))
+    let best = |it: &mut dyn Iterator<Item = &'a WindowInfo>| {
+        it.max_by(|a, b| (a.on_screen, a.bounds.w * a.bounds.h).partial_cmp(&(b.on_screen, b.bounds.w * b.bounds.h)).unwrap())
     };
     if let Some(saved) = saved
-        && let Some(w) = largest(&mut windows.iter().filter(|w| saved.matches(w)))
+        && let Some(w) = best(&mut windows.iter().filter(|w| saved.matches(w)))
     {
         return Some(w);
     }
-    let maple = |s: &str| s.to_lowercase().contains("maplestory");
+    let mentions = |w: &WindowInfo, word: &str| format!("{} {}", w.owner, w.title).to_lowercase().contains(word);
     let big = |w: &WindowInfo| w.bounds.w >= MIN_GAME_SIZE.0 && w.bounds.h >= MIN_GAME_SIZE.1;
-    largest(&mut windows.iter().filter(|w| (maple(&w.owner) || maple(&w.title)) && big(w)))
+    best(&mut windows.iter().filter(|w| mentions(w, "maplestory") && !mentions(w, "launcher") && big(w)))
 }
 
 /// The characters of `chars` that `set` has no template for.
@@ -206,6 +207,7 @@ mod tests {
             owner: owner.into(),
             bounds: RectPt { x: 0.0, y: 0.0, w, h },
             scale: 2.0,
+            on_screen: true,
         }
     }
 
@@ -233,6 +235,21 @@ mod tests {
         // The Nexon Launcher is titled MapleStory too, but small.
         let launcher = [window(4, "Nexon Launcher", "MapleStory", 800.0, 300.0)];
         assert_eq!(find_game_window(&launcher, None), None);
+    }
+
+    #[test]
+    fn picks_the_game_over_the_launchers() {
+        // The titled windows on a real Mac with the game open (2026-10-19).
+        let hidden = |w: WindowInfo| WindowInfo { on_screen: false, ..w };
+        let windows = [
+            hidden(window(8130, "MapleStory Launcher", "Nexon Global Launcher", 1920.0, 1022.0)),
+            window(8131, "MapleStory Launcher", "NexonLauncher", 800.0, 300.0),
+            window(12914, "MapleStory Classic World", "MapleStory", 1366.0, 796.0),
+        ];
+        assert_eq!(find_game_window(&windows, None).map(|w| w.id), Some(12914));
+        // Fullscreen in another Space it's hidden, but still the game.
+        let away = [windows[0].clone(), windows[1].clone(), hidden(windows[2].clone())];
+        assert_eq!(find_game_window(&away, None).map(|w| w.id), Some(12914));
     }
 
     #[test]

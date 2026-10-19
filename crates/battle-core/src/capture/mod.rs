@@ -45,6 +45,7 @@ impl RectPt {
 
 /// A capturable top-level window.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WindowInfo {
     /// Platform window id (CGWindowID on macOS, HWND on Windows).
     pub id: u64,
@@ -54,6 +55,8 @@ pub struct WindowInfo {
     pub bounds: RectPt,
     /// Scale factor of the display the window is on.
     pub scale: f64,
+    /// Visible on the current Space (a fullscreen game in another Space isn't).
+    pub on_screen: bool,
 }
 
 /// An RGBA8 image, either a whole window or a sub-rectangle of one.

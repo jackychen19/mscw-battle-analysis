@@ -8,7 +8,7 @@ use battle_core::calibration::{
     Calibration, EXP_CHARS, ExpFontLearner, Missing, NEEDED_SAMPLES, Regions, Sample, SampleError, WindowMatch,
     find_exp_text, find_game_window, find_level_near, find_regions, missing_chars, teach_sample,
 };
-use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
+use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, RectPx, WindowInfo};
 use battle_core::parse::ExpReader;
 use battle_core::stats::Observation;
 use serde::Serialize;
@@ -243,7 +243,9 @@ impl Capturer {
         let exp = find_exp_text(&strip);
         let lvl = exp.and_then(|e| find_level_near(&strip, e));
         if exp.is_none() || lvl.is_none() {
-            save_debug_crop("locate-strip", &strip);
+            // Only the bottom of the window (where the status bar is drawn), never the whole frame.
+            let h = strip.height * 3 / 10;
+            save_debug_crop("locate-bottom", &strip.crop(RectPx { x: 0, y: strip.height - h, w: strip.width, h }));
         }
         eprintln!(
             "[locate] window {}x{} pt @{}x, strip {}x{} px: exp {exp:?}, level {lvl:?}",
