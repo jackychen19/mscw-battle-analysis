@@ -10,6 +10,9 @@ use super::line::TextLine;
 pub const DEFAULT_MIN_SCORE: f32 = 0.75;
 /// Templates kept per character; extra variants help with blurry captures.
 const MAX_VARIANTS: usize = 8;
+/// When teaching, a glyph this similar to another character's template (and
+/// not to its own) means the line was segmented wrongly.
+const CONFLICT_SCORE: f32 = 0.97;
 
 /// One learned character: its columns at the full height of its line, in
 /// grayscale so blur and fading don't erase the details that tell similar
@@ -31,6 +34,9 @@ pub enum TeachError {
     NoInk,
     /// The line has fewer glyphs than the typed text has characters.
     GlyphCount { expected: usize, found: usize },
+    /// A glyph taught as `ch` looks exactly like an already-known `looks_like`:
+    /// the line was probably split into glyphs wrongly. Nothing was learned.
+    Conflict { ch: char, looks_like: char },
 }
 
 impl fmt::Display for TeachError {
@@ -39,6 +45,9 @@ impl fmt::Display for TeachError {
             Self::NoInk => write!(f, "no text found in the selected box"),
             Self::GlyphCount { expected, found } => {
                 write!(f, "expected {expected} characters but found {found} in the selected box")
+            }
+            Self::Conflict { ch, looks_like } => {
+                write!(f, "the character taught as {ch:?} looks like {looks_like:?}; try another sample")
             }
         }
     }
@@ -56,6 +65,18 @@ pub struct LineRead {
     pub score: f32,
 }
 
+impl LineRead {
+    fn from_parts(parts: Vec<(char, Range<u32>, f32)>) -> Self {
+        let mut out = Self { text: String::new(), spans: Vec::new(), score: 1.0 };
+        for (ch, span, score) in parts {
+            out.text.push(ch);
+            out.spans.push(span);
+            out.score = out.score.min(score);
+        }
+        out
+    }
+}
+
 impl GlyphSet {
     /// Learns templates from `line` showing `text`. Spaces in `text` are
     /// ignored. If the line has more glyphs than `text` has characters, the
@@ -71,10 +92,26 @@ impl GlyphSet {
             return Err(TeachError::GlyphCount { expected: chars.len(), found });
         }
         let first = found - chars.len();
-        for (i, &ch) in chars.iter().enumerate() {
-            self.add(GlyphTemplate { ch, image: line.glyph(first + i) });
+        let taught: Vec<GlyphTemplate> =
+            chars.iter().enumerate().map(|(i, &ch)| GlyphTemplate { ch, image: line.glyph(first + i) }).collect();
+        if let Some(conflict) = taught.iter().find_map(|t| self.conflict(t)) {
+            return Err(conflict);
         }
+        taught.into_iter().for_each(|t| self.add(t));
         Ok(line.glyphs[first].start)
+    }
+
+    fn conflict(&self, t: &GlyphTemplate) -> Option<TeachError> {
+        let best_for = |same: bool| {
+            self.glyphs
+                .iter()
+                .filter(|g| (g.ch == t.ch) == same)
+                .map(|g| (g.ch, similarity(&t.image, &g.image)))
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+        };
+        let (looks_like, other) = best_for(false)?;
+        let own = best_for(true).map_or(0.0, |(_, s)| s);
+        (other >= CONFLICT_SCORE && own < other).then_some(TeachError::Conflict { ch: t.ch, looks_like })
     }
 
     pub fn add(&mut self, t: GlyphTemplate) {
@@ -91,28 +128,44 @@ impl GlyphSet {
     /// Reads `line` left to right. `None` if any glyph matches no template
     /// with at least `min_score`.
     pub fn read(&self, line: &TextLine, min_score: f32) -> Option<LineRead> {
-        let max_width = self.glyphs.iter().map(|g| g.image.width()).max()?;
-        let mut out = LineRead { text: String::new(), spans: Vec::new(), score: 1.0 };
-        for run in line.glyphs.iter().cloned() {
-            let piece = line.gray.crop_columns(run.clone());
-            let single = self.best_match(&piece).filter(|&(_, s)| s >= min_score);
-            match single {
-                Some((ch, score)) if piece.width() <= max_width + 1 => {
-                    out.text.push(ch);
-                    out.spans.push(run);
-                    out.score = out.score.min(score);
-                }
-                // Blur can merge neighbouring glyphs into one run: split it.
-                _ => {
-                    for (ch, span, score) in self.split(&piece, min_score)? {
-                        out.text.push(ch);
-                        out.spans.push(run.start + span.start..run.start + span.end);
-                        out.score = out.score.min(score);
-                    }
-                }
+        let mut parts = Vec::new();
+        for run in &line.glyphs {
+            parts.extend(self.read_run(line, run.clone(), min_score)?);
+        }
+        Some(LineRead::from_parts(parts))
+    }
+
+    /// Reads `line` right to left, stopping as soon as `done` accepts the
+    /// text read so far (e.g. once `(+48)` has been read from a longer
+    /// notification). `None` if a glyph fails to match first.
+    pub fn read_from_right(&self, line: &TextLine, min_score: f32, done: impl Fn(&str) -> bool) -> Option<LineRead> {
+        let mut parts = Vec::new();
+        for run in line.glyphs.iter().rev() {
+            let mut run_parts = self.read_run(line, run.clone(), min_score)?;
+            run_parts.extend(parts);
+            parts = run_parts;
+            let text: String = parts.iter().map(|p| p.0).collect();
+            if done(&text) {
+                return Some(LineRead::from_parts(parts));
             }
         }
-        Some(out)
+        None
+    }
+
+    /// One glyph run as characters: a single template, or several when blur
+    /// merged neighbouring glyphs into one run.
+    fn read_run(&self, line: &TextLine, run: Range<u32>, min_score: f32) -> Option<Vec<(char, Range<u32>, f32)>> {
+        let max_width = self.glyphs.iter().map(|g| g.image.width()).max()?;
+        let piece = line.gray.crop_columns(run.clone());
+        match self.best_match(&piece).filter(|&(_, s)| s >= min_score) {
+            Some((ch, score)) if piece.width() <= max_width + 1 => Some(vec![(ch, run, score)]),
+            _ => Some(
+                self.split(&piece, min_score)?
+                    .into_iter()
+                    .map(|(ch, span, score)| (ch, run.start + span.start..run.start + span.end, score))
+                    .collect(),
+            ),
+        }
     }
 
     fn best_match(&self, piece: &Gray) -> Option<(char, f32)> {
@@ -162,8 +215,9 @@ impl GlyphSet {
 }
 
 /// Normalized cross-correlation of two glyph images, aligned on their left
-/// edge. Searches vertical shifts of up to 2 px and horizontal shifts of up
-/// to 1.5 px in half-pixel steps: when the game is scaled by a non-integer
+/// edge. Searches vertical shifts of up to 4 px (a line's band can gain a few
+/// rows of map art above or below) and horizontal shifts of up to 1.5 px in
+/// half-pixel steps: when the game is scaled by a non-integer
 /// factor, the same glyph renders differently depending on where it falls
 /// between pixels. Insensitive to overall brightness and contrast (fading
 /// lines). Areas outside an image count as that image's background (its
@@ -179,14 +233,16 @@ pub fn similarity(a: &Gray, b: &Gray) -> f32 {
     let best_of = |candidates: &mut dyn Iterator<Item = (i32, i32)>| {
         candidates.map(|(dy, dx)| (dy, dx, score(dy, dx))).max_by(|p, q| p.2.total_cmp(&q.2)).unwrap()
     };
-    let (dy, _, _) = best_of(&mut (-2..=2).map(|dy| (dy, 0)));
+    let (dy, _, _) = best_of(&mut (-MAX_DY..=MAX_DY).map(|dy| (dy, 0)));
     let (_, dx, _) = best_of(&mut (-3..=3).map(|dx| (dy, dx)));
-    let (_, _, best) = best_of(&mut (-2..=2).map(|dy| (dy, dx)));
+    let (_, _, best) = best_of(&mut (dy - 1..=dy + 1).map(|dy| (dy, dx)));
     best.max(0.0) as f32
 }
 
-/// Margin around the compared area: 2 px for the window, 2 more for shifts.
-const PAD: usize = 4;
+const MAX_DY: i32 = 4;
+/// Margin around the compared area: 2 px for the window, plus the largest
+/// shift (and one more for the half-pixel blend).
+const PAD: usize = 2 + MAX_DY as usize + 1;
 
 struct Padded {
     stride: usize,
@@ -269,6 +325,17 @@ mod tests {
     }
 
     #[test]
+    fn reads_from_the_right_until_done() {
+        let set = taught();
+        // The label on the left isn't taught, but reading stops before it.
+        let line = render("EXP.12[3%]", 1);
+        let read = set.read_from_right(&line, DEFAULT_MIN_SCORE, |t| t.starts_with('[')).unwrap();
+        assert_eq!(read.text, "[3%]");
+        assert_eq!(read.spans.len(), 4);
+        assert!(set.read_from_right(&line, DEFAULT_MIN_SCORE, |t| t.starts_with('X')).is_none());
+    }
+
+    #[test]
     fn comma_and_period_differ_by_height() {
         let set = taught();
         assert_eq!(set.read(&render("1,1.1", 1), DEFAULT_MIN_SCORE).unwrap().text, "1,1.1");
@@ -314,6 +381,16 @@ mod tests {
         let empty = TextLine { bitmap: Bitmap::new(5, 5), gray: Gray::new(5, 5, vec![0; 25]), glyphs: vec![] };
         assert_eq!(set.teach(&empty, "1"), Err(TeachError::NoInk));
         assert_eq!(set.teach(&render("12", 1), "123"), Err(TeachError::GlyphCount { expected: 3, found: 2 }));
+    }
+
+    #[test]
+    fn teaching_a_mis_segmented_line_is_refused() {
+        let mut set = taught();
+        let before = set.glyphs.len();
+        // "17" typed for a line that shows "71": both glyphs contradict.
+        let err = set.teach(&render("71", 1), "17").unwrap_err();
+        assert_eq!(err, TeachError::Conflict { ch: '1', looks_like: '7' });
+        assert_eq!(set.glyphs.len(), before, "nothing learned");
     }
 
     #[test]

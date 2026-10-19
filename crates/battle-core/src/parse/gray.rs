@@ -14,6 +14,9 @@ pub enum Channel {
     /// Darkest of R, G, B: high only for white-ish pixels, so white text
     /// separates from saturated backgrounds (e.g. digits on orange tiles).
     Min,
+    /// Darker of R and G: high for white and yellow text, low for green
+    /// foliage and brown map art behind the notification stack.
+    MinRG,
 }
 
 /// 8-bit single-channel image. Serialized as rows of hex bytes so glyph
@@ -42,6 +45,7 @@ impl Gray {
                 let v = match channel {
                     Channel::Luma => (299 * r + 587 * g + 114 * b) / 1000,
                     Channel::Min => r.min(g).min(b),
+                    Channel::MinRG => r.min(g),
                 };
                 data.push(v as u8);
             }
@@ -268,5 +272,9 @@ mod tests {
         let min = Gray::from_rgba(2, 1, 8, &orange_then_white, Channel::Min);
         assert!(luma.get(0, 0) > 130);
         assert_eq!((min.get(0, 0), min.get(1, 0)), (40, 230));
+        // Yellow text vs green leaves.
+        let yellow_then_green = [220, 215, 90, 255, 120, 200, 80, 255];
+        let rg = Gray::from_rgba(2, 1, 8, &yellow_then_green, Channel::MinRG);
+        assert_eq!((rg.get(0, 0), rg.get(1, 0)), (215, 120));
     }
 }
