@@ -33,6 +33,10 @@ Notification lines are listed top to bottom.
 
 A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, Sleepy Dungeon), so the text is scaled by a non-integer factor and video-compressed: a harder case than a native capture. Only 0–122 s is used; after that the browser window moves.
 
+### native-01
+
+`bar.png`: the status bar cut from a macOS screenshot of the game window (Lv 33, EXP 117,832 [84.98%]). Unlike grinding-01 it's sharp, as a direct window capture is: each character is drawn identically.
+
 ## Never committed (gitignored)
 
 - `video/`: gameplay recordings.

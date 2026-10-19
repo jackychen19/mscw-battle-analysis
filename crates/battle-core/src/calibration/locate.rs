@@ -199,6 +199,19 @@ fn mirror(g: &Gray) -> Gray {
     Gray::new(w, h, (0..h).flat_map(|y| (0..w).rev().map(move |x| (x, y))).map(|(x, y)| g.get(x, y)).collect())
 }
 
+/// The level tiles on the EXP line's status bar: in the band of rows around
+/// it and to its left. Elsewhere in the window, other orange things (the
+/// minimap's buttons, quest icons) would match too.
+pub fn find_level_near(frame: &Frame, exp: RectPx) -> Option<RectPx> {
+    let y0 = exp.y.saturating_sub(exp.h * 2);
+    let y1 = (exp.y + exp.h * 3).min(frame.height);
+    let band = RectPx { x: 0, y: y0, w: exp.x, h: y1 - y0 };
+    // Tiles are about as tall as the text; the nearest such group to the
+    // left is on the same bar (map art further left can be orange too).
+    let r = tile_groups(&frame.crop(band), exp.h / 2).into_iter().max_by_key(|g| g.x)?;
+    Some(RectPx { x: r.x + band.x, y: r.y + band.y, ..r })
+}
+
 /// Both regions in `strip`, a capture of `area` (points, window-relative) at
 /// `scale`, converted back to window points.
 pub fn find_regions(strip: &Frame, area: RectPt, scale: f64) -> Option<Regions> {
@@ -208,7 +221,8 @@ pub fn find_regions(strip: &Frame, area: RectPt, scale: f64) -> Option<Regions> 
         w: f64::from(r.w) / scale,
         h: f64::from(r.h) / scale,
     };
-    Some(Regions { exp_text: to_pt(find_exp_text(strip)?), level: to_pt(find_level(strip)?) })
+    let exp = find_exp_text(strip)?;
+    Some(Regions { exp_text: to_pt(exp), level: to_pt(find_level_near(strip, exp)?) })
 }
 
 fn orange(p: [u8; 4]) -> bool {
@@ -219,9 +233,15 @@ fn orange(p: [u8; 4]) -> bool {
 /// The level's orange digit tiles: the leftmost row of one to three
 /// same-sized, roughly square orange tiles.
 pub fn find_level(frame: &Frame) -> Option<RectPx> {
+    tile_groups(frame, 6).into_iter().min_by_key(|g| g.x)
+}
+
+/// Rows of one to three same-sized, roughly square orange tiles at least
+/// `min_h` pixels tall, as boxes with a small margin.
+fn tile_groups(frame: &Frame, min_h: u32) -> Vec<RectPx> {
     let tiles: Vec<Blob> = blobs(frame.width, frame.height, |x, y| orange(frame.pixel(x, y)))
         .into_iter()
-        .filter(|b| (6..=80).contains(&b.h()) && b.w() * 10 >= b.h() * 6 && b.w() * 10 <= b.h() * 15)
+        .filter(|b| (min_h.max(6)..=80).contains(&b.h()) && b.w() * 10 >= b.h() * 6 && b.w() * 10 <= b.h() * 15)
         .filter(|b| b.pixels * 10 >= b.w() * b.h() * 3)
         .collect();
     let mut groups: Vec<Vec<Blob>> = Vec::new();
@@ -239,11 +259,16 @@ pub fn find_level(frame: &Frame) -> Option<RectPx> {
             None => groups.push(vec![t]),
         }
     }
-    let g = groups.into_iter().filter(|g| g.len() <= 3).min_by_key(|g| g[0].x0)?;
-    let margin = (g[0].h() / 6).max(2);
-    let x0 = g[0].x0.saturating_sub(margin);
-    let y0 = g.iter().map(|b| b.y0).min()?.saturating_sub(margin);
-    let x1 = (g.last()?.x1 + margin).min(frame.width);
-    let y1 = (g.iter().map(|b| b.y1).max()? + margin).min(frame.height);
-    Some(RectPx { x: x0, y: y0, w: x1 - x0, h: y1 - y0 })
+    groups
+        .into_iter()
+        .filter(|g| g.len() <= 3)
+        .map(|g| {
+            let margin = (g[0].h() / 6).max(2);
+            let x0 = g[0].x0.saturating_sub(margin);
+            let y0 = g.iter().map(|b| b.y0).min().unwrap().saturating_sub(margin);
+            let x1 = (g.last().unwrap().x1 + margin).min(frame.width);
+            let y1 = (g.iter().map(|b| b.y1).max().unwrap() + margin).min(frame.height);
+            RectPx { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+        })
+        .collect()
 }

@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use battle_core::calibration::{
     Calibration, EXP_CHARS, ExpFontLearner, Missing, NEEDED_SAMPLES, Regions, Sample, SampleError, WindowMatch,
-    find_exp_text, find_game_window, find_level, find_regions, missing_chars, teach_sample,
+    find_exp_text, find_game_window, find_level_near, find_regions, missing_chars, teach_sample,
 };
 use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
 use battle_core::parse::ExpReader;
@@ -20,8 +20,6 @@ const SCAN_EVERY: Duration = Duration::from_secs(2);
 const CALIBRATION_FILE: &str = "calibration.json";
 /// How often to look for the EXP text and level again while they're not found.
 const LOCATE_EVERY: Duration = Duration::from_secs(3);
-/// Fraction of the window, from the bottom, searched for the status bar.
-const STATUS_BAR_SHARE: f64 = 0.25;
 /// Distinct samples without a solution before the boxes are looked for again.
 const RELOCATE_AFTER: usize = 24;
 
@@ -224,7 +222,7 @@ impl Capturer {
         }
     }
 
-    /// Looks for the EXP text and level in the bottom of the window, if due.
+    /// Looks for the EXP text and level anywhere in the window, if due.
     /// Both must be found and the level must read.
     fn locate(&mut self, game: &WindowInfo) -> Option<Regions> {
         let now = Instant::now();
@@ -232,16 +230,9 @@ impl Capturer {
             return None;
         }
         self.auto.last_locate = Some(now);
-        let h = game.bounds.h * STATUS_BAR_SHARE;
-        let area = RectPt { x: 0.0, y: game.bounds.h - h, w: game.bounds.w, h };
-        // Snap to the pixel grid so found pixels convert back exactly.
-        let px = area.to_px(game.scale);
-        let area = RectPt {
-            x: f64::from(px.x) / game.scale,
-            y: f64::from(px.y) / game.scale,
-            w: f64::from(px.w) / game.scale,
-            h: f64::from(px.h) / game.scale,
-        };
+        // The whole window: its reported size doesn't always match where the
+        // game draws, so the status bar can't be assumed to be at the bottom.
+        let area = RectPt { x: 0.0, y: 0.0, w: game.bounds.w, h: game.bounds.h };
         let strip = match self.capture(area) {
             Ok(s) => s,
             Err(e) => {
@@ -249,7 +240,8 @@ impl Capturer {
                 return None;
             }
         };
-        let (exp, lvl) = (find_exp_text(&strip), find_level(&strip));
+        let exp = find_exp_text(&strip);
+        let lvl = exp.and_then(|e| find_level_near(&strip, e));
         if exp.is_none() || lvl.is_none() {
             save_debug_crop("locate-strip", &strip);
         }

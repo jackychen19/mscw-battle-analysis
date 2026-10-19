@@ -2,7 +2,7 @@
 
 mod common;
 
-use battle_core::calibration::{ExpFontLearner, find_exp_text, find_level, find_regions};
+use battle_core::calibration::{ExpFontLearner, find_exp_text, find_level, find_level_near, find_regions};
 use battle_core::capture::{RectPt, RectPx};
 use battle_core::parse::ExpReader;
 use common::Fixture;
@@ -107,4 +107,14 @@ fn regions_come_back_in_window_points() {
     // Converting back at 2x gives the same pixels.
     let back = RectPt { y: r.exp_text.y - 500.0, ..r.exp_text }.to_px(2.0);
     assert_eq!(back, px);
+}
+
+#[test]
+fn finds_exp_and_level_on_a_native_capture() {
+    // The status bar from a macOS screenshot of the game window (Lv 33,
+    // EXP 117,832 [84.98%]): sharp, as a direct capture is.
+    let bar = common::load_png(&common::fixtures_dir().join("native-01/bar.png"));
+    let exp = find_exp_text(&bar).expect("EXP line");
+    let level = find_level_near(&bar, exp).expect("level");
+    assert_eq!(ExpReader::default().read_level(&bar.crop(level)), Some(33));
 }

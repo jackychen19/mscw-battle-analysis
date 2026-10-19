@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 mod learn;
 mod locate;
-pub use locate::{find_exp_text, find_level, find_regions};
+pub use locate::{find_exp_text, find_level, find_level_near, find_regions};
 pub use learn::{ExpFontLearner, NEEDED_SAMPLES};
 
 use std::fmt;
