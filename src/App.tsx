@@ -24,13 +24,14 @@ export default function App() {
   }, [refresh]);
 
   // Keep the native window exactly as tall as the panel.
+  const hasView = view !== null;
   useLayoutEffect(() => {
     const el = panelRef.current;
     if (!el) return;
     const ro = new ResizeObserver(() => void fitWindowHeight(WINDOW_WIDTH, el.offsetHeight + WINDOW_MARGIN * 2));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [view !== null]);
+  }, [hasView]);
 
   const onCommand = (command: SessionCommand) => {
     setError(null);
