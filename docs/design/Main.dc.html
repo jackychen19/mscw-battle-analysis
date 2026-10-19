@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Battle Analysis idle</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#ffd23f}a:hover{color:#ffe27a}
+</style>
+</helmet>
+<div style="width: 360px; height: 420px; box-sizing: border-box; padding: 30px; background: #33402f; display: flex; align-items: flex-start; justify-content: center; font-family: Nunito, system-ui, sans-serif">
+<div style="width: 300px; box-sizing: border-box; padding: 10px; border-radius: 12px; background: #2b3139; border: 2px solid #8c939c; box-shadow: inset 0 0 0 1px #4d555f, 0 6px 18px rgba(0,0,0,0.45); display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 2px 2px 0 4px">
+<div style="font-size: 15px; font-weight: 900; letter-spacing: 0.04em; color: #f4f4f4">BATTLE ANALYSIS</div>
+<div style="display: flex; gap: 4px">
+<button aria-label="Help" style="width: 24px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid #5c636c; background: #3d444d; color: #e8e8e8; font: 800 13px Nunito, sans-serif">?</button>
+<button aria-label="Settings and calibration" style="width: 24px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid #4f7d1f; background: #6fa52e; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"></path></svg></button>
+<button aria-label="Close" style="width: 24px; height: 24px; padding: 0; border-radius: 5px; border: 1px solid #a8561a; background: #e07a24; color: #ffffff; font: 900 14px Nunito, sans-serif">×</button>
+</div>
+</div>
+<div style="padding: 10px 12px; border-radius: 8px; background: #1c2127; border: 1px solid #47505a; display: flex; flex-direction: column; gap: 6px">
+<div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; font-weight: 700; color: #a9b0b8"><span>LAST SESSION</span><span>Lv. 59 · 34.07%</span></div>
+<div style="height: 6px; border-radius: 3px; background: #3a414a; overflow: hidden"><div style="width: 34%; height: 6px; background: #b8e04a"></div></div>
+<div style="height: 4px"></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>Battle Duration</span><span style="color: {{accent}}">00:32:10</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>EXP Acquired</span><span style="color: {{accent}}">82,340</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #c4cad1; padding-left: 10px"><span>per min</span><span>2,559 / min</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>Mesos Acquired</span><span style="color: {{accent}}">41,205</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #c4cad1; padding-left: 10px"><span>per min</span><span>1,281 / min</span></div>
+<div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: #f2f2f2"><span>Next Level</span><span style="color: {{accent}}">~1h 41m</span></div>
+</div>
+<button style="height: 46px; border-radius: 23px; border: 2px solid #4d7a18; background: #79b534; box-shadow: inset 0 2px 0 #a4d65e; color: #ffffff; font: 900 18px Nunito, sans-serif; display: flex; align-items: center; justify-content: center; gap: 10px">
+<svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="12" cy="12" r="9.5"></circle><circle cx="12" cy="12" r="4" fill="currentColor"></circle></svg>
+Start Analyzing</button>
+<div style="text-align: center; font-size: 11px; font-weight: 700; color: #8f979f; letter-spacing: 0.02em; padding-bottom: 2px">for MapleStory Classic World · unofficial</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#ffd23f","options":["#ffd23f","#ffb84a","#9fe0ff"]},"$preview":{"width":360,"height":420}}'>
+class Component extends DCLogic {
+renderVals() {
+return { accent: this.props.accent ?? '#ffd23f' };
+}
+}
+</script>
+</body>
+</html>
