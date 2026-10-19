@@ -10,6 +10,8 @@ authors.workspace = true
 # The `_lib` suffix keeps the lib name distinct from the bin name (cargo#8519 on Windows).
 name = "battle_analysis_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+# No doctests here, and rustdoc linking this crate type takes ~20 minutes.
+doctest = false
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
