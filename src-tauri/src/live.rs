@@ -134,6 +134,12 @@ impl Capturer {
             Err(e) => return self.on_error(&e),
         };
         let Some(found) = find_game_window(&windows, self.chosen.as_ref()).cloned() else {
+            let maple: Vec<String> = windows
+                .iter()
+                .filter(|w| format!("{} {}", w.owner, w.title).to_lowercase().contains("maple"))
+                .map(|w| format!("{:?} / {:?} {}x{}", w.owner, w.title, w.bounds.w, w.bounds.h))
+                .collect();
+            eprintln!("[scan] no game window among {} windows; MapleStory-like: {maple:?}", windows.len());
             self.game = None;
             return;
         };

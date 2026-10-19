@@ -34,10 +34,11 @@ pub struct MacFrameSource {
 impl MacFrameSource {
     fn shareable_windows() -> Result<Vec<SCWindow>, CaptureError> {
         let content = SCShareableContent::create()
-            .with_on_screen_windows_only(true)
+            .with_on_screen_windows_only(false)
             .with_exclude_desktop_windows(true)
             .get()
             .map_err(map_err)?;
+        // Off-screen windows count too: a fullscreen game sits in its own Space.
         // Layer 0 = ordinary app windows (no menu bar, dock, overlays).
         Ok(content.windows().into_iter().filter(|w| w.window_layer() == 0).collect())
     }
