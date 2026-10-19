@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use super::blocky::read_blocky_digits;
 use super::glyph::{DEFAULT_MIN_SCORE, GlyphSet, TeachError};
 use super::gray::{Channel, Gray};
 use super::line::TextLine;
@@ -50,8 +51,12 @@ impl ExpReader {
         parse_exp_text(&self.exp_glyphs.read(&line, self.min_score)?.text)
     }
 
+    /// With no level templates taught, the digits are read by shape.
     pub fn read_level(&self, crop: &Frame) -> Option<u32> {
         let line = level_line(crop)?;
+        if self.level_glyphs.is_empty() {
+            return parse_level_text(&read_blocky_digits(&line)?);
+        }
         parse_level_text(&self.level_glyphs.read(&line, self.min_score)?.text)
     }
 }

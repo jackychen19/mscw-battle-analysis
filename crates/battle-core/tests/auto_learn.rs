@@ -83,3 +83,14 @@ fn finds_exp_and_level_on_the_status_bar() {
     assert_eq!(reader.read_exp(&bar.crop(exp)), Some((422_579, 3684)));
     assert_eq!(reader.read_level(&bar.crop(level)), Some(59));
 }
+
+#[test]
+fn reads_the_level_by_shape_with_nothing_taught() {
+    let reader = ExpReader::default();
+    // Blur can wipe a stroke; then the frame is skipped, never misread.
+    let reads: Vec<Option<u32>> = Fixture::all("grinding-01").iter().map(|f| reader.read_level(&f.crop("level"))).collect();
+    assert!(reads.iter().all(|r| r.is_none_or(|l| l == 59)), "{reads:?}");
+    assert!(reads.iter().filter(|r| r.is_some()).count() >= 8, "{reads:?}");
+    let bar = common::load_png(&common::fixtures_dir().join("grinding-01/bar-0465.png"));
+    assert_eq!(reader.read_level(&bar.crop(find_level(&bar).unwrap())), Some(59));
+}
