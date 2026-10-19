@@ -47,5 +47,11 @@ export function captureNotice(view: View): string {
   const { capture } = view;
   if (capture.permission === "denied") return "Screen Recording not allowed · open ⚙ to fix";
   if (capture.game === null) return view.autoPaused ? "MapleStory window lost · paused" : "MapleStory not detected";
+  const { learning } = capture;
+  if (learning && !learning.found) return "Looking for the EXP bar…";
+  if (learning) {
+    const n = Math.min(learning.samples, learning.needed);
+    return `Learning the game's font · kill a few monsters (${n}/${learning.needed})`;
+  }
   return "Not calibrated · open ⚙ to set up";
 }

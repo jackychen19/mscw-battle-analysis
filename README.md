@@ -47,17 +47,19 @@ Capture uses ScreenCaptureKit screenshots of just the text regions, which needs 
 
 ## Calibration
 
-Calibration teaches the app the game's font at your resolution and display scale. Open it with the green ⚙ button:
+There's nothing to set up: with the game open, Battle Analysis calibrates itself.
 
-1. Pick the MapleStory window (found automatically when its app or title says MapleStory).
-2. On the screenshot, drag a box around the EXP text above the EXP bar, then one around the level digits. The close-ups below show what each box captures.
-3. Type the level, EXP and percent the game shows right now, and click **Learn**. The app slices out each character, saves it as a template, and checks that both boxes read back as what you typed.
+1. It finds the MapleStory window, then the EXP text and the level on the status bar at the bottom.
+2. It learns the game's digits on its own. The EXP line always has the same layout (`422,579[36.84%]`), so the brackets, `%`, `.` and `,` are known from where they sit. The digits are the one assignment for which EXP ÷ percent comes out the same across readings. Just play: a few kills give it enough different readings. The panel shows *Learning the game's font* until it's done.
+3. The level's blocky digits are read by their shape, so a level-up to digits it hasn't seen yet still reads.
 
-One sample only teaches the digits on screen, so the window lists the characters still missing. Click **Learn** again (with the new values) after a few kills until none are left; readings that need an untaught character are skipped.
+Digits that haven't appeared yet keep being learned in the background; readings that need one are skipped until then.
+
+If it can't find the EXP bar, the calibration window (green ⚙ button) has a manual fallback: drag boxes around the EXP text and the level, type what they show, and click **Learn**.
 
 **Start Analyzing** stays disabled until the game window is found and calibrated. If the window goes away mid-session, recording pauses automatically.
 
-Calibration is saved locally in the app's data directory (`calibration.json`). Redo it if you change resolution, window size or display scaling.
+Calibration is saved locally in the app's data directory (`calibration.json`). It's redone automatically if you resize the game window or change display scaling.
 
 ## Roadmap
 
@@ -80,7 +82,7 @@ Prerequisites: macOS with Xcode Command Line Tools, [Rust](https://rustup.rs) (s
 ```sh
 npm install
 npm run tauri dev        # run the app on live capture; BATTLE_MOCK=1 npm run tauri dev for the synthetic feed
-npm run dev              # UI only, in a browser, with mock data; ?mock=idle|recording|paused|stopped|empty, ?game=none, ?window=calibrate
+npm run dev              # UI only, in a browser, with mock data; ?mock=idle|recording|paused|stopped|empty, ?game=none|learning, ?window=calibrate
 npm run lint             # ESLint (fails on warnings)
 npm run typecheck        # TypeScript
 cargo test               # Rust tests (stats engine and core)

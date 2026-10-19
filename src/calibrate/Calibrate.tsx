@@ -108,6 +108,11 @@ export function Calibrate() {
   return (
     <div className="calib">
       <h1>Calibration</h1>
+      <p className="calib-muted">
+        Battle Analysis sets itself up: with the game open it finds the EXP bar and learns the game&apos;s digits as
+        your EXP changes, so just play for a moment. Use the steps below only if the panel keeps saying it can&apos;t
+        find the EXP bar.
+      </p>
 
       <section className="calib-step">
         <h2>1. Game window</h2>

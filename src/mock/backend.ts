@@ -12,7 +12,14 @@ let lastSession: Snapshot | null = param === "empty" ? null : stoppedSnapshot;
 let lastTick = Date.now();
 // `?game=none` shows the "MapleStory not detected" state.
 const noGame = new URLSearchParams(window.location.search).get("game") === "none";
-const capture: CaptureStatus = { permission: "granted", game: noGame ? null : "MapleStory", calibrated: !noGame };
+// `?game=learning` shows automatic calibration in progress.
+const learningParam = new URLSearchParams(window.location.search).get("game") === "learning";
+const capture: CaptureStatus = {
+  permission: "granted",
+  game: noGame ? null : "MapleStory",
+  calibrated: !noGame && !learningParam,
+  learning: learningParam ? { found: true, samples: 2, needed: 4 } : null,
+};
 
 function tick(): void {
   const now = Date.now();
@@ -27,7 +34,7 @@ function tick(): void {
 
 function view(): View {
   tick();
-  return { snapshot: current, lastSession, mock: true, capture, canStart: !noGame, autoPaused: false };
+  return { snapshot: current, lastSession, mock: true, capture, canStart: capture.calibrated, autoPaused: false };
 }
 
 export const mockBackend: Backend = {

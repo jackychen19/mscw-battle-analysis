@@ -29,6 +29,16 @@ export interface CaptureStatus {
   game: string | null;
   /** Calibrated for this window at its current scale. */
   calibrated: boolean;
+  /** Automatic calibration in progress. */
+  learning: Learning | null;
+}
+
+export interface Learning {
+  /** The EXP text and level were found on screen. */
+  found: boolean;
+  /** Distinct EXP readings seen so far, and how many a solution needs. */
+  samples: number;
+  needed: number;
 }
 
 export interface View {
