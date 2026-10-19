@@ -1,6 +1,9 @@
 import type { Snapshot } from "../types";
 import { formatDuration, formatEta, formatInt, formatPct, formatShortDuration } from "../format";
 
+/** Meso tracking is on hold (SPEC §9), so its rows are hidden. */
+const SHOW_MESOS = false;
+
 /** `placeholder` renders dashes for values (idle with no previous session). */
 export function StatsBox({ snap, caption, placeholder = false }: { snap: Snapshot; caption: string; placeholder?: boolean }) {
   const dash = (v: string) => (placeholder ? "—" : v);
@@ -29,8 +32,12 @@ export function StatsBox({ snap, caption, placeholder = false }: { snap: Snapsho
         <Row label="Battle Duration" value={dash(formatDuration(snap.durationMs))} />
         <Row label="EXP Acquired" value={dash(formatInt(snap.expGained))} flag={snap.expApproximate ? "≈" : undefined} />
         <Row sub label="per min" value={dash(`${formatInt(snap.expPerMin)} / min`)} />
-        <Row label="Mesos Acquired" value={dash(formatInt(snap.mesoGained))} flag={snap.mesoPossibleUndercount ? "≥" : undefined} />
-        <Row sub label="per min" value={dash(`${formatInt(snap.mesoPerMin)} / min`)} />
+        {SHOW_MESOS && (
+          <>
+            <Row label="Mesos Acquired" value={dash(formatInt(snap.mesoGained))} flag={snap.mesoPossibleUndercount ? "≥" : undefined} />
+            <Row sub label="per min" value={dash(`${formatInt(snap.mesoPerMin)} / min`)} />
+          </>
+        )}
         {stopped ? (
           <Row muted label="Paused" value={`${formatShortDuration(snap.pausedMs)} (not counted)`} />
         ) : (
