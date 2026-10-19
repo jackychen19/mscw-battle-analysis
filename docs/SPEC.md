@@ -16,6 +16,7 @@ Sections are self-contained; read only the one a task needs. Decisions made afte
 - macOS first (native Nexon Launcher client). Windows later, so design for it now:
   - All OS-specific code goes behind Rust traits: `trait FrameSource` (find the game window, get the latest frame or a sub-rectangle of it) and the floating-window behavior (`trait FloatingWindow`).
   - Implement only the macOS versions now. Capture uses ScreenCaptureKit via the `screencapturekit` crate. **Decided:** chosen over `scap` because it exposes per-window filters and `sourceRect` sub-rectangle capture.
+    **Decided (M3):** pinned to `screencapturekit = 2.1.0`; 5.0+ pull in `apple-metal`, whose Swift bridge needs the macOS 26 SDK. Each capture is a one-shot `SCScreenshotManager` screenshot of the region (window filter + `sourceRect`, snapped to whole pixels), so macOS 14+ is required. Region coordinates are points from the window's top-left as ScreenCaptureKit captures it.
   - Never hardcode Retina/2x. Display scale factor is a variable everywhere (Windows uses 125%/150%).
 - The floating panel must stay visible over the game in a native macOS fullscreen Space: floating level, joins fullscreen Spaces, doesn't steal focus. **Decided:** `tauri-nspanel`.
 
@@ -34,6 +35,7 @@ The game uses a fixed bitmap font. For each region: crop → binarize by brightn
 - For notifications, match the fixed prefix `You have gained mesos (+` as one whole-image template, then read only the digits. Binarization must handle varied map backgrounds and fading lines.
 - The parser should also report each notification line's brightness ("freshness"). The stats engine uses it to tell a repeated amount apart from the same line seen again (see §6).
 - Store calibration (window id/title, region rects relative to the game window, templates) as small local files in the app data dir.
+- **Decided (M3):** calibration runs in its own window (gear button): pick the window, drag boxes for the EXP text and level on a 1-px-per-point screenshot, type the values, Learn. Each sample is taught only if both boxes read back as typed; the `EXP.` label is trimmed off the box automatically. One sample teaches only the digits on screen, so the window lists the untaught characters and the user teaches more samples as EXP changes. Saved as `calibration.json` in the app data dir; reused only for the same window title/owner at the same scale.
 
 ## 5. Capture loop
 

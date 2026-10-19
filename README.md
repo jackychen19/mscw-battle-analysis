@@ -4,7 +4,7 @@ A small floating panel for **MapleStory Classic World** that tracks how much EXP
 
 > **Not affiliated with or endorsed by Nexon. Read-only screen capture; no game memory access or input automation. Use at your own risk.**
 
-> **Status:** early development. EXP tracking from live macOS capture works (Milestone 3); mesos are on hold. See [Roadmap](#roadmap).
+> **Status:** early development. Live macOS capture and calibration for EXP are in progress (Milestone 3); mesos are on hold. See [Roadmap](#roadmap).
 
 ## What it tracks
 
@@ -63,7 +63,7 @@ Calibration is saved locally in the app's data directory (`calibration.json`). R
 
 - [x] **M1**: Project scaffold, stats engine with tests, UI on mock data
 - [x] **M2**: Bitmap-font parser for EXP and notification text, tested against real screenshots
-- [x] **M3**: Live macOS capture (ScreenCaptureKit), permission flow, window picker, calibration
+- [ ] **M3**: Live macOS capture (ScreenCaptureKit), permission flow, window picker, calibration
 - [ ] **M4**: Floating panel that stays above the fullscreen game without stealing focus
 - [ ] **M5**: Mesos end-to-end, debug-crop mode, local session history
 - [ ] **Windows** support (Windows.Graphics.Capture). Capture and floating-window code already sit behind traits, and display scale (125% / 150%) is never hardcoded.
