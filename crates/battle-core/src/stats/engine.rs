@@ -2,10 +2,10 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use super::filter::{ReadingFilter, StackFilter};
+use super::filter::ReadingFilter;
 use super::level::{LevelTable, MaxEstimator};
-use super::meso_align::{DEFAULT_FRESHNESS_TOLERANCE, align};
-use super::reading::{ExpReading, Line, LineKind};
+use super::meso_track::{DEFAULT_FRESHNESS_TOLERANCE, MesoTracker};
+use super::reading::{ExpReading, Line};
 use super::rolling::{DEFAULT_ROLLING_WINDOW_MS, Rolling, per_min};
 use super::snapshot::Snapshot;
 
@@ -76,16 +76,13 @@ pub struct Session {
     /// Survives resets: level maxes learned in one session stay valid.
     estimator: MaxEstimator,
     exp_filter: ReadingFilter,
-    stack_filter: StackFilter,
+    meso_tracker: MesoTracker,
 
     start_reading: Option<ExpReading>,
     last_reading: Option<ExpReading>,
     /// Set on Start/Resume: the next accepted reading/stack is a baseline,
     /// so gains while paused (or lines already on screen) aren't counted.
     exp_needs_baseline: bool,
-    /// The previous confirmed stack, each line with whether it has been
-    /// counted (or was already on screen when recording started).
-    last_stack: Option<Vec<(Line, bool)>>,
 
     exp_gained: u64,
     meso_gained: u64,
@@ -106,11 +103,10 @@ impl Session {
             state: SessionState::Idle,
             estimator: MaxEstimator::new(config.level_table),
             exp_filter: ReadingFilter::default(),
-            stack_filter: StackFilter::default(),
+            meso_tracker: MesoTracker::new(config.freshness_tolerance),
             start_reading: None,
             last_reading: None,
             exp_needs_baseline: true,
-            last_stack: None,
             exp_gained: 0,
             meso_gained: 0,
             exp_approximate: false,
@@ -178,9 +174,9 @@ impl Session {
                 }
             }
             Observation::Stack(lines) => {
-                if let Some(stack) = self.stack_filter.feed(lines) {
-                    self.accept_stack(stack);
-                }
+                let update = self.meso_tracker.feed(&lines);
+                self.meso_gained += update.meso;
+                self.meso_possible_undercount |= update.possible_overflow;
             }
             Observation::Unreadable => {}
         }
@@ -225,9 +221,8 @@ impl Session {
 
     fn begin_segment(&mut self) {
         self.exp_filter.reset();
-        self.stack_filter.reset();
+        self.meso_tracker.reset();
         self.exp_needs_baseline = true;
-        self.last_stack = None;
     }
 
     fn close_segment(&mut self, t_ms: u64) {
@@ -279,33 +274,4 @@ impl Session {
         }
         gain
     }
-
-    /// Counts each notification line once. A line is counted the first time
-    /// it is read as a known kind, so one that was covered (Unknown) when it
-    /// appeared is still counted once it becomes readable.
-    fn accept_stack(&mut self, stack: Vec<Line>) {
-        let Some(prev) = self.last_stack.take() else {
-            // Baseline: lines already on screen are not new.
-            self.last_stack = Some(stack.into_iter().map(|l| (l, true)).collect());
-            return;
-        };
-        let prev_lines: Vec<Line> = prev.iter().map(|(l, _)| *l).collect();
-        let alignment = align(&prev_lines, &stack, self.freshness_tolerance);
-        if alignment.overlap == 0 && !prev.is_empty() && !stack.is_empty() {
-            self.meso_possible_undercount = true;
-        }
-        let mut next = Vec::with_capacity(stack.len());
-        for (i, line) in stack.into_iter().enumerate() {
-            let mut counted = i < alignment.overlap && prev[alignment.shift + i].1;
-            if !counted && !line.is_unknown() {
-                if line.kind == LineKind::Meso {
-                    self.meso_gained += line.amount;
-                }
-                counted = true;
-            }
-            next.push((line, counted));
-        }
-        self.last_stack = Some(next);
-    }
-
 }

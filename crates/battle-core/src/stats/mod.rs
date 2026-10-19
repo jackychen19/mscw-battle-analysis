@@ -4,7 +4,7 @@
 mod engine;
 mod filter;
 mod level;
-mod meso_align;
+mod meso_track;
 mod reading;
 mod rolling;
 mod snapshot;
@@ -13,9 +13,9 @@ mod snapshot;
 mod tests;
 
 pub use engine::{Command, Observation, Session, SessionConfig, SessionState, TransitionError};
-pub use filter::{ReadingFilter, StackFilter};
+pub use filter::ReadingFilter;
 pub use level::{LevelTable, MaxEstimator, MaxExp};
-pub use meso_align::{Alignment, DEFAULT_FRESHNESS_TOLERANCE, align};
+pub use meso_track::{DEFAULT_FRESHNESS_TOLERANCE, MesoTracker, Update};
 pub use reading::{ExpReading, Line, LineKind};
 pub use rolling::{DEFAULT_ROLLING_WINDOW_MS, Rolling};
 pub use snapshot::Snapshot;
