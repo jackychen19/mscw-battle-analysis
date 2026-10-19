@@ -25,6 +25,8 @@ export interface Snapshot {
 export interface View {
   snapshot: Snapshot;
   lastSession: Snapshot | null;
+  /** True while the numbers come from a synthetic feed rather than the game. */
+  mock: boolean;
 }
 
 export type SessionCommand = "start" | "pause" | "resume" | "stop" | "new";

@@ -24,7 +24,7 @@ function tick(): void {
 
 function view(): View {
   tick();
-  return { snapshot: current, lastSession };
+  return { snapshot: current, lastSession, mock: true };
 }
 
 export const mockBackend: Backend = {

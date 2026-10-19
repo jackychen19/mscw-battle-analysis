@@ -21,6 +21,8 @@ pub struct View {
     snapshot: Snapshot,
     /// Results of the previous session, shown while idle.
     last_session: Option<Snapshot>,
+    /// True while the numbers come from the synthetic feed (Milestone 1).
+    mock: bool,
 }
 
 impl AppState {
@@ -38,7 +40,11 @@ impl AppState {
     }
 
     fn view(&self) -> View {
-        View { snapshot: self.session.snapshot(self.now_ms()), last_session: self.last_session.clone() }
+        View {
+            snapshot: self.session.snapshot(self.now_ms()),
+            last_session: self.last_session.clone(),
+            mock: true,
+        }
     }
 
     pub fn tick_mock(&mut self) {

@@ -1,22 +1,20 @@
+/* Values taken from the inline styles in docs/design/*.dc.html (source of truth). */
 :root {
   --panel-bg: #2b3139;
   --panel-border: #8c939c;
+  --panel-inner-line: #4d555f;
   --inset-bg: #1c2127;
-  --inset-line: #2f363f;
-  --text: #ffffff;
-  --value: #ffd23f;
-  --muted: #8f98a3;
+  --inset-border: #47505a;
 
-  --green: #6fa52e;
-  --start: #79b534;
-  --start-dark: #4f7d1d;
-  --stop: #e0662a;
-  --stop-dark: #9e3f12;
-  --orange: #e07a24;
-  --gray-btn: #6b737d;
-  --rec: #d63a3a;
-  --progress: #8fd14f;
+  --title: #f4f4f4;
+  --label: #f2f2f2;
+  --sub: #c4cad1;
+  --caption: #a9b0b8;
+  --footer: #8f979f;
+  --accent: #ffd23f;
 
-  --radius: 12px;
+  --progress-track: #3a414a;
+  --progress-fill: #b8e04a;
+
   --font: "Nunito", system-ui, sans-serif;
 }
