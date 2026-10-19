@@ -1,0 +1,148 @@
+use crate::capture::{Frame, RectPx};
+
+use super::bitmap::Bitmap;
+
+/// 8-bit luminance image.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Gray {
+    width: u32,
+    height: u32,
+    data: Vec<u8>,
+}
+
+impl Gray {
+    pub fn new(width: u32, height: u32, data: Vec<u8>) -> Self {
+        assert_eq!(data.len(), width as usize * height as usize, "gray buffer size");
+        Self { width, height, data }
+    }
+
+    /// Converts RGBA8 rows (`stride` bytes apart) to luminance (Rec. 601).
+    pub fn from_rgba(width: u32, height: u32, stride: usize, rgba: &[u8]) -> Self {
+        let mut data = Vec::with_capacity(width as usize * height as usize);
+        for y in 0..height as usize {
+            let row = &rgba[y * stride..];
+            for x in 0..width as usize {
+                let p = &row[x * 4..x * 4 + 3];
+                let lum = (299 * u32::from(p[0]) + 587 * u32::from(p[1]) + 114 * u32::from(p[2])) / 1000;
+                data.push(lum as u8);
+            }
+        }
+        Self { width, height, data }
+    }
+
+    pub fn from_frame(frame: &Frame) -> Self {
+        Self::from_rgba(frame.width, frame.height, frame.stride, &frame.rgba)
+    }
+
+    pub fn width(&self) -> u32 {
+        self.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.height
+    }
+
+    pub fn get(&self, x: u32, y: u32) -> u8 {
+        self.data[(y * self.width + x) as usize]
+    }
+
+    /// Sub-image, clamped to the image bounds.
+    pub fn crop(&self, r: RectPx) -> Gray {
+        let x0 = r.x.min(self.width);
+        let y0 = r.y.min(self.height);
+        let x1 = (r.x + r.w).min(self.width);
+        let y1 = (r.y + r.h).min(self.height);
+        let mut data = Vec::with_capacity(((x1 - x0) * (y1 - y0)) as usize);
+        for y in y0..y1 {
+            let start = (y * self.width + x0) as usize;
+            data.extend_from_slice(&self.data[start..start + (x1 - x0) as usize]);
+        }
+        Gray { width: x1 - x0, height: y1 - y0, data }
+    }
+
+    /// Pixels brighter than `threshold` become ink.
+    pub fn binarize(&self, threshold: u8) -> Bitmap {
+        let mut b = Bitmap::new(self.width, self.height);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                if self.get(x, y) > threshold {
+                    b.set(x, y, true);
+                }
+            }
+        }
+        b
+    }
+
+    /// Otsu's threshold: the split that best separates dark background from
+    /// bright text. Works per crop, so it adapts to each region's background.
+    pub fn otsu_threshold(&self) -> u8 {
+        let mut hist = [0u64; 256];
+        for &v in &self.data {
+            hist[v as usize] += 1;
+        }
+        let total = self.data.len() as f64;
+        let sum_all: f64 = hist.iter().enumerate().map(|(i, &n)| i as f64 * n as f64).sum();
+        let (mut weight_bg, mut sum_bg) = (0.0, 0.0);
+        let (mut best, mut best_var) = (0u8, -1.0);
+        for (t, &n) in hist.iter().enumerate() {
+            weight_bg += n as f64;
+            sum_bg += t as f64 * n as f64;
+            let weight_fg = total - weight_bg;
+            if weight_bg == 0.0 || weight_fg == 0.0 {
+                continue;
+            }
+            let mean_bg = sum_bg / weight_bg;
+            let mean_fg = (sum_all - sum_bg) / weight_fg;
+            let var = weight_bg * weight_fg * (mean_bg - mean_fg).powi(2);
+            if var > best_var {
+                best_var = var;
+                best = t as u8;
+            }
+        }
+        best
+    }
+
+    /// Mean brightness of the pixels that are ink in `mask`, 0 if none.
+    pub fn mean_under(&self, mask: &Bitmap) -> u8 {
+        let (mut sum, mut n) = (0u64, 0u64);
+        for y in 0..self.height.min(mask.height()) {
+            for x in 0..self.width.min(mask.width()) {
+                if mask.get(x, y) {
+                    sum += u64::from(self.get(x, y));
+                    n += 1;
+                }
+            }
+        }
+        sum.checked_div(n).map_or(0, |mean| mean as u8)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn luminance_crop_and_otsu() {
+        // 4x2: dark background (30) with a bright stroke (220) and one mid pixel.
+        let rgba: Vec<u8> = [30, 220, 220, 30, 30, 30, 120, 30]
+            .iter()
+            .flat_map(|&v| [v, v, v, 255])
+            .collect();
+        let g = Gray::from_rgba(4, 2, 16, &rgba);
+        assert_eq!(g.get(1, 0), 220);
+        let t = g.otsu_threshold();
+        assert!((30..120).contains(&t), "threshold {t}");
+        assert_eq!(g.binarize(t).to_ascii(), vec![".##.", "..#."]);
+        assert_eq!(g.binarize(150).to_ascii(), vec![".##.", "...."]);
+        assert_eq!(g.crop(RectPx { x: 1, y: 0, w: 9, h: 1 }).width(), 3);
+        assert_eq!(g.mean_under(&Bitmap::from_ascii(&[".##.", "..#."])), ((220 + 220 + 120) / 3) as u8);
+    }
+
+    #[test]
+    fn honours_stride_padding() {
+        let mut rgba = vec![0u8; 2 * 12];
+        rgba[12..16].copy_from_slice(&[200, 200, 200, 255]);
+        let g = Gray::from_rgba(2, 2, 12, &rgba);
+        assert_eq!((g.get(0, 0), g.get(0, 1)), (0, 200));
+    }
+}

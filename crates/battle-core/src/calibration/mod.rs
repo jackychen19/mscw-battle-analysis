@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::capture::RectPt;
+use crate::parse::Bitmap;
 
 pub const CALIBRATION_VERSION: u32 = 1;
 
@@ -32,14 +33,6 @@ pub struct Regions {
     pub exp_text: RectPt,
     pub level: RectPt,
     pub notifications: RectPt,
-}
-
-/// A binarized image: `bits[y * width + x]` is true for text pixels.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Bitmap {
-    pub width: u32,
-    pub height: u32,
-    pub bits: Vec<bool>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
