@@ -1,10 +1,13 @@
 use serde::{Deserialize, Serialize};
 
+use super::bitmap::Bitmap;
 use super::glyph::{DEFAULT_MIN_SCORE, GlyphSet, TeachError, line_band};
-use super::gray::Gray;
+use super::gray::{Channel, Gray};
+use crate::capture::Frame;
 use crate::stats::ExpReading;
 
-/// Reads the EXP line (`419,165[36.54%]`, label excluded) and the level.
+/// Reads the EXP line (`419,165[36.54%]`, label excluded) and the level from
+/// colour crops of their regions.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExpReader {
@@ -23,38 +26,44 @@ impl ExpReader {
     /// Calibration: the EXP crop currently shows `exp` and `pct_hundredths`.
     /// Returns the column where the number starts (anything left of it, like
     /// the `EXP.` label, should be cropped off from then on).
-    pub fn teach_exp(&mut self, crop: &Gray, exp: u64, pct_hundredths: u32) -> Result<u32, TeachError> {
-        let band = line_band(&binarize(crop)).ok_or(TeachError::NoInk)?;
+    pub fn teach_exp(&mut self, crop: &Frame, exp: u64, pct_hundredths: u32) -> Result<u32, TeachError> {
+        let band = line_band(&binarize(crop, EXP_CHANNEL)).ok_or(TeachError::NoInk)?;
         self.exp_glyphs.teach(&band, &format_exp_text(exp, pct_hundredths))
     }
 
     /// Calibration: the level crop currently shows `level`.
-    pub fn teach_level(&mut self, crop: &Gray, level: u32) -> Result<u32, TeachError> {
-        let band = line_band(&binarize(crop)).ok_or(TeachError::NoInk)?;
+    pub fn teach_level(&mut self, crop: &Frame, level: u32) -> Result<u32, TeachError> {
+        let band = line_band(&binarize(crop, LEVEL_CHANNEL)).ok_or(TeachError::NoInk)?;
         self.level_glyphs.teach(&band, &level.to_string())
     }
 
     /// `None` when the crop can't be read confidently (menus, tooltips,
     /// loading screens, or a malformed result).
-    pub fn read(&self, exp_crop: &Gray, level_crop: &Gray) -> Option<ExpReading> {
+    pub fn read(&self, exp_crop: &Frame, level_crop: &Frame) -> Option<ExpReading> {
         let (exp, pct_hundredths) = self.read_exp(exp_crop)?;
         let level = self.read_level(level_crop)?;
         Some(ExpReading { level, exp, pct_hundredths })
     }
 
-    pub fn read_exp(&self, crop: &Gray) -> Option<(u64, u32)> {
-        let band = line_band(&binarize(crop))?;
+    pub fn read_exp(&self, crop: &Frame) -> Option<(u64, u32)> {
+        let band = line_band(&binarize(crop, EXP_CHANNEL))?;
         parse_exp_text(&self.exp_glyphs.read(&band, self.min_score)?.text)
     }
 
-    pub fn read_level(&self, crop: &Gray) -> Option<u32> {
-        let band = line_band(&binarize(crop))?;
+    pub fn read_level(&self, crop: &Frame) -> Option<u32> {
+        let band = line_band(&binarize(crop, LEVEL_CHANNEL))?;
         parse_level_text(&self.level_glyphs.read(&band, self.min_score)?.text)
     }
 }
 
-fn binarize(crop: &Gray) -> super::Bitmap {
-    crop.binarize(crop.otsu_threshold())
+/// White digits with yellow-green brackets on a dark bar.
+const EXP_CHANNEL: Channel = Channel::Luma;
+/// White digits on orange tiles.
+const LEVEL_CHANNEL: Channel = Channel::Min;
+
+fn binarize(crop: &Frame, channel: Channel) -> Bitmap {
+    let gray = Gray::from_frame(crop, channel);
+    gray.binarize(gray.otsu_threshold())
 }
 
 /// `440834, 3843` → `440,834[38.43%]`, as the game draws it (without spaces).
@@ -106,7 +115,7 @@ pub fn parse_level_text(s: &str) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parse::test_font::render_gray;
+    use crate::parse::test_font::render_frame;
 
     #[test]
     fn formats_like_the_game() {
@@ -146,25 +155,25 @@ mod tests {
     #[test]
     fn teach_then_read_a_reading() {
         let mut reader = ExpReader::default();
-        let start = reader.teach_exp(&render_gray("EXP. 440,834[38.43%]"), 440_834, 3843).unwrap();
+        let start = reader.teach_exp(&render_frame("EXP. 440,834[38.43%]"), 440_834, 3843).unwrap();
         assert!(start > 0, "label skipped");
-        reader.teach_exp(&render_gray("765,192[45.67%]"), 765_192, 4567).unwrap();
-        reader.teach_level(&render_gray("59"), 59).unwrap();
-        reader.teach_level(&render_gray("60"), 60).unwrap();
+        reader.teach_exp(&render_frame("765,192[45.67%]"), 765_192, 4567).unwrap();
+        reader.teach_level(&render_frame("59"), 59).unwrap();
+        reader.teach_level(&render_frame("60"), 60).unwrap();
 
-        let r = reader.read(&render_gray("441,912[38.52%]"), &render_gray("65"));
+        let r = reader.read(&render_frame("441,912[38.52%]"), &render_frame("65"));
         assert_eq!(r, Some(ExpReading::new(65, 441_912, 3852)));
     }
 
     #[test]
     fn unreadable_crops_give_none() {
         let mut reader = ExpReader::default();
-        reader.teach_exp(&render_gray("440,834[38.43%]"), 440_834, 3843).unwrap();
-        reader.teach_level(&render_gray("59"), 59).unwrap();
-        let blank = Gray::new(20, 9, vec![40; 180]);
+        reader.teach_exp(&render_frame("440,834[38.43%]"), 440_834, 3843).unwrap();
+        reader.teach_level(&render_frame("59"), 59).unwrap();
+        let blank = Frame { width: 20, height: 9, stride: 80, rgba: vec![40; 720] };
         assert_eq!(reader.read_exp(&blank), None);
         // Readable glyphs, malformed number.
-        assert_eq!(reader.read_exp(&render_gray("44,0834[38.43%]")), None);
-        assert_eq!(reader.read(&render_gray("440,834[38.43%]"), &blank), None);
+        assert_eq!(reader.read_exp(&render_frame("44,0834[38.43%]")), None);
+        assert_eq!(reader.read(&render_frame("440,834[38.43%]"), &blank), None);
     }
 }

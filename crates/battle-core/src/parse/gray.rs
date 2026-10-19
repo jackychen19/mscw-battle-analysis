@@ -2,7 +2,17 @@ use crate::capture::{Frame, RectPx};
 
 use super::bitmap::Bitmap;
 
-/// 8-bit luminance image.
+/// How RGB pixels become one brightness value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Channel {
+    /// Perceived brightness (Rec. 601). Good for any bright text.
+    Luma,
+    /// Darkest of R, G, B: high only for white-ish pixels, so white text
+    /// separates from saturated backgrounds (e.g. digits on orange tiles).
+    Min,
+}
+
+/// 8-bit single-channel image.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Gray {
     width: u32,
@@ -16,22 +26,25 @@ impl Gray {
         Self { width, height, data }
     }
 
-    /// Converts RGBA8 rows (`stride` bytes apart) to luminance (Rec. 601).
-    pub fn from_rgba(width: u32, height: u32, stride: usize, rgba: &[u8]) -> Self {
+    /// Converts RGBA8 rows (`stride` bytes apart) using `channel`.
+    pub fn from_rgba(width: u32, height: u32, stride: usize, rgba: &[u8], channel: Channel) -> Self {
         let mut data = Vec::with_capacity(width as usize * height as usize);
         for y in 0..height as usize {
             let row = &rgba[y * stride..];
             for x in 0..width as usize {
-                let p = &row[x * 4..x * 4 + 3];
-                let lum = (299 * u32::from(p[0]) + 587 * u32::from(p[1]) + 114 * u32::from(p[2])) / 1000;
-                data.push(lum as u8);
+                let [r, g, b] = [row[x * 4], row[x * 4 + 1], row[x * 4 + 2]].map(u32::from);
+                let v = match channel {
+                    Channel::Luma => (299 * r + 587 * g + 114 * b) / 1000,
+                    Channel::Min => r.min(g).min(b),
+                };
+                data.push(v as u8);
             }
         }
         Self { width, height, data }
     }
 
-    pub fn from_frame(frame: &Frame) -> Self {
-        Self::from_rgba(frame.width, frame.height, frame.stride, &frame.rgba)
+    pub fn from_frame(frame: &Frame, channel: Channel) -> Self {
+        Self::from_rgba(frame.width, frame.height, frame.stride, &frame.rgba, channel)
     }
 
     pub fn width(&self) -> u32 {
@@ -128,7 +141,7 @@ mod tests {
             .iter()
             .flat_map(|&v| [v, v, v, 255])
             .collect();
-        let g = Gray::from_rgba(4, 2, 16, &rgba);
+        let g = Gray::from_rgba(4, 2, 16, &rgba, Channel::Luma);
         assert_eq!(g.get(1, 0), 220);
         let t = g.otsu_threshold();
         assert!((30..120).contains(&t), "threshold {t}");
@@ -142,7 +155,16 @@ mod tests {
     fn honours_stride_padding() {
         let mut rgba = vec![0u8; 2 * 12];
         rgba[12..16].copy_from_slice(&[200, 200, 200, 255]);
-        let g = Gray::from_rgba(2, 2, 12, &rgba);
+        let g = Gray::from_rgba(2, 2, 12, &rgba, Channel::Luma);
         assert_eq!((g.get(0, 0), g.get(0, 1)), (0, 200));
+    }
+
+    #[test]
+    fn min_channel_rejects_saturated_colours() {
+        let orange_then_white = [230, 120, 40, 255, 240, 240, 230, 255];
+        let luma = Gray::from_rgba(2, 1, 8, &orange_then_white, Channel::Luma);
+        let min = Gray::from_rgba(2, 1, 8, &orange_then_white, Channel::Min);
+        assert!(luma.get(0, 0) > 130);
+        assert_eq!((min.get(0, 0), min.get(1, 0)), (40, 230));
     }
 }

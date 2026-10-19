@@ -15,5 +15,5 @@ mod test_font;
 pub use bitmap::Bitmap;
 pub use exp::{ExpReader, format_exp_text, parse_exp_text, parse_level_text};
 pub use glyph::{DEFAULT_MIN_SCORE, GlyphSet, GlyphTemplate, LineRead, TeachError, line_band, similarity};
-pub use gray::Gray;
+pub use gray::{Channel, Gray};
 pub use segment::{column_runs, row_runs};

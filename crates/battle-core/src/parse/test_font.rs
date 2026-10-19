@@ -49,18 +49,19 @@ pub fn render(text: &str, gap: u32) -> Bitmap {
     Bitmap::from_ascii(&rows)
 }
 
-/// `render(text, 1)` as a grayscale crop: bright text on a dark background
-/// with a 1-pixel margin, the way a captured region looks.
-pub fn render_gray(text: &str) -> super::gray::Gray {
+/// `render(text, 1)` as a captured RGBA crop: near-white text on a dark
+/// background with a 1-pixel margin.
+pub fn render_frame(text: &str) -> crate::capture::Frame {
     let b = render(text, 1);
     let (w, h) = (b.width() + 2, b.height() + 2);
-    let mut data = vec![40u8; (w * h) as usize];
+    let mut rgba = [40u8, 40, 40, 255].repeat((w * h) as usize);
     for y in 0..b.height() {
         for x in 0..b.width() {
             if b.get(x, y) {
-                data[((y + 1) * w + x + 1) as usize] = 230;
+                let i = (((y + 1) * w + x + 1) * 4) as usize;
+                rgba[i..i + 3].copy_from_slice(&[235, 235, 225]);
             }
         }
     }
-    super::gray::Gray::new(w, h, data)
+    crate::capture::Frame { width: w, height: h, stride: w as usize * 4, rgba }
 }
