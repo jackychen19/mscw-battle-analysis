@@ -301,3 +301,19 @@ button:focus-visible {
   color: #fff;
   cursor: pointer;
 }
+
+.capture-notice {
+  align-self: center;
+  margin-top: -2px;
+  color: #ffb27a;
+  font-size: 12px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pill-btn:disabled,
+.round-btn:disabled {
+  filter: grayscale(0.85) brightness(0.75);
+  cursor: not-allowed;
+  transform: none;
+}

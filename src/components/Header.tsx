@@ -1,5 +1,5 @@
 import type { SessionState } from "../types";
-import { closeWindow } from "../api";
+import { closeWindow, openCalibration } from "../api";
 import { IconButton, icons } from "./Buttons";
 
 export function Header({ state }: { state: SessionState }) {
@@ -14,7 +14,9 @@ export function Header({ state }: { state: SessionState }) {
       <div className="header-buttons">
         <IconButton tone="help" label="Help">?</IconButton>
         {state === "idle" && (
-          <IconButton tone="gear" label="Settings and calibration">{icons.gear}</IconButton>
+          <IconButton tone="gear" label="Settings and calibration" onClick={() => void openCalibration()}>
+            {icons.gear}
+          </IconButton>
         )}
         <IconButton tone="close" label="Close" onClick={() => void closeWindow()}>×</IconButton>
       </div>

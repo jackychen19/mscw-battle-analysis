@@ -1,5 +1,6 @@
 import { forwardRef } from "react";
 import type { SessionCommand, SessionState, View } from "../types";
+import { captureNotice } from "../format";
 import { ActionBar } from "./ActionBar";
 import { Header } from "./Header";
 import { StatsBox } from "./StatsBox";
@@ -22,7 +23,8 @@ export const Panel = forwardRef<HTMLDivElement, { view: View; onCommand: (c: Ses
       <div className="panel" ref={ref}>
         <Header state={state} />
         <StatsBox snap={shown ?? snapshot} caption={caption} placeholder={shown === null} />
-        <ActionBar state={state} onCommand={onCommand} />
+        <ActionBar state={state} canStart={view.canStart} onCommand={onCommand} />
+        {state !== "recording" && !view.canStart && <div className="capture-notice">{captureNotice(view)}</div>}
         {view.mock && (
           <div className="mock-badge" title="Numbers come from a synthetic feed, not the game">
             MOCK DATA

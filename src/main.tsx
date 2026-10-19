@@ -6,13 +6,17 @@ import "@fontsource/nunito/800.css";
 import "@fontsource/nunito/900.css";
 import "./styles/tokens.css";
 import "./styles/panel.css";
+import "./styles/calibrate.css";
 import App from "./App";
-import { inTauri } from "./api";
+import { Calibrate } from "./calibrate/Calibrate";
+import { inTauri, windowLabel } from "./api";
 
 document.documentElement.classList.toggle("in-tauri", inTauri);
 
-ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+void windowLabel().then((label) => {
+  const calibrate = label === "calibrate";
+  document.documentElement.classList.toggle("calibrate", calibrate);
+  ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
+    <React.StrictMode>{calibrate ? <Calibrate /> : <App />}</React.StrictMode>,
+  );
+});

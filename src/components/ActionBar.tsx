@@ -1,11 +1,11 @@
 import type { SessionCommand, SessionState } from "../types";
 import { PillButton, RoundButton, icons } from "./Buttons";
 
-export function ActionBar({ state, onCommand }: { state: SessionState; onCommand: (c: SessionCommand) => void }) {
+export function ActionBar({ state, canStart, onCommand }: { state: SessionState; canStart: boolean; onCommand: (c: SessionCommand) => void }) {
   switch (state) {
     case "idle":
       return (
-        <PillButton tone="start" icon={icons.start} onClick={() => onCommand("start")}>
+        <PillButton tone="start" icon={icons.start} disabled={!canStart} onClick={() => onCommand("start")}>
           Start Analyzing
         </PillButton>
       );
@@ -16,7 +16,7 @@ export function ActionBar({ state, onCommand }: { state: SessionState; onCommand
           {state === "recording" ? (
             <RoundButton label="Pause" onClick={() => onCommand("pause")}>{icons.pause}</RoundButton>
           ) : (
-            <RoundButton label="Resume" onClick={() => onCommand("resume")}>{icons.resume}</RoundButton>
+            <RoundButton label="Resume" disabled={!canStart} onClick={() => onCommand("resume")}>{icons.resume}</RoundButton>
           )}
           <PillButton tone="stop" icon={icons.stop} onClick={() => onCommand("stop")}>
             Stop
@@ -25,7 +25,7 @@ export function ActionBar({ state, onCommand }: { state: SessionState; onCommand
       );
     case "stopped":
       return (
-        <PillButton tone="start" icon={icons.restart} onClick={() => onCommand("new")}>
+        <PillButton tone="start" icon={icons.restart} disabled={!canStart} onClick={() => onCommand("new")}>
           Start New Session
         </PillButton>
       );

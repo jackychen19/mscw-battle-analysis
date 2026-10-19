@@ -4,7 +4,7 @@ A small floating panel for **MapleStory Classic World** that tracks how much EXP
 
 > **Not affiliated with or endorsed by Nexon. Read-only screen capture; no game memory access or input automation. Use at your own risk.**
 
-> **Status:** early development. Milestone 1 (stats engine + UI on mock data) is done; live screen capture arrives in Milestone 3. See [Roadmap](#roadmap).
+> **Status:** early development. EXP tracking from live macOS capture works (Milestone 3); mesos are on hold. See [Roadmap](#roadmap).
 
 ## What it tracks
 
@@ -39,25 +39,31 @@ Battle Analysis reads **only the pixels of the game window**, the same way a scr
 
 macOS requires permission before any app can capture another app's window:
 
-1. Start Battle Analysis and click **Start Analyzing**. macOS will prompt for Screen Recording access.
-2. Open **System Settings → Privacy & Security → Screen Recording** and enable **Battle Analysis**.
+1. Open the calibration window (the green ⚙ button) and click **Ask for permission**. macOS will prompt for Screen Recording access.
+2. If it doesn't, click **Open System Settings** (Privacy & Security → Screen Recording) and enable **Battle Analysis**.
 3. Quit and reopen the app.
+
+Capture uses ScreenCaptureKit screenshots of just the text regions, which needs **macOS 14 (Sonoma) or later**.
 
 ## Calibration
 
-*(Coming in Milestone 3.)* Calibration teaches the app the game's font at your resolution and display scale:
+Calibration teaches the app the game's font at your resolution and display scale. Open it with the green ⚙ button:
 
-1. Pick the MapleStory window.
-2. Drag a box around the EXP text above the EXP bar and type what it shows, e.g. `440834 38.43`. The app slices out each character and saves it as a template.
-3. Do the same for the level number and the notification area.
+1. Pick the MapleStory window (found automatically when its app or title says MapleStory).
+2. On the screenshot, drag a box around the EXP text above the EXP bar, then one around the level digits. The close-ups below show what each box captures.
+3. Type the level, EXP and percent the game shows right now, and click **Learn**. The app slices out each character, saves it as a template, and checks that both boxes read back as what you typed.
 
-Calibration is saved locally in the app's data directory. Redo it if you change resolution, window size or display scaling.
+One sample only teaches the digits on screen, so the window lists the characters still missing. Click **Learn** again (with the new values) after a few kills until none are left; readings that need an untaught character are skipped.
+
+**Start Analyzing** stays disabled until the game window is found and calibrated. If the window goes away mid-session, recording pauses automatically.
+
+Calibration is saved locally in the app's data directory (`calibration.json`). Redo it if you change resolution, window size or display scaling.
 
 ## Roadmap
 
 - [x] **M1**: Project scaffold, stats engine with tests, UI on mock data
-- [ ] **M2**: Bitmap-font parser for EXP and notification text, tested against real screenshots
-- [ ] **M3**: Live macOS capture (ScreenCaptureKit), permission flow, window picker, calibration
+- [x] **M2**: Bitmap-font parser for EXP and notification text, tested against real screenshots
+- [x] **M3**: Live macOS capture (ScreenCaptureKit), permission flow, window picker, calibration
 - [ ] **M4**: Floating panel that stays above the fullscreen game without stealing focus
 - [ ] **M5**: Mesos end-to-end, debug-crop mode, local session history
 - [ ] **Windows** support (Windows.Graphics.Capture). Capture and floating-window code already sit behind traits, and display scale (125% / 150%) is never hardcoded.
@@ -73,8 +79,8 @@ Prerequisites: macOS with Xcode Command Line Tools, [Rust](https://rustup.rs) (s
 
 ```sh
 npm install
-npm run tauri dev        # run the app (drives the real stats engine from a mock feed in M1)
-npm run dev              # UI only, in a browser, with mock data; ?mock=idle|recording|paused|stopped|empty
+npm run tauri dev        # run the app on live capture; BATTLE_MOCK=1 npm run tauri dev for the synthetic feed
+npm run dev              # UI only, in a browser, with mock data; ?mock=idle|recording|paused|stopped|empty, ?game=none, ?window=calibrate
 npm run lint             # ESLint (fails on warnings)
 npm run typecheck        # TypeScript
 cargo test               # Rust tests (stats engine and core)

@@ -1,3 +1,5 @@
+import type { View } from "./types";
+
 export function formatDuration(ms: number): string {
   const total = Math.floor(ms / 1000);
   const h = Math.floor(total / 3600);
@@ -38,4 +40,12 @@ export function formatInt(n: number): string {
 
 export function formatPct(hundredths: number | null): string {
   return hundredths === null ? "—" : `${(hundredths / 100).toFixed(2)}%`;
+}
+
+/** Why Start is disabled. */
+export function captureNotice(view: View): string {
+  const { capture } = view;
+  if (capture.permission === "denied") return "Screen Recording not allowed · open ⚙ to fix";
+  if (capture.game === null) return view.autoPaused ? "MapleStory window lost · paused" : "MapleStory not detected";
+  return "Not calibrated · open ⚙ to set up";
 }

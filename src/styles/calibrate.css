@@ -1,0 +1,154 @@
+/* Calibration window: a normal, opaque window, so no panel chrome. */
+
+html.calibrate,
+html.calibrate body {
+  background: var(--panel-bg);
+  overflow: auto;
+  user-select: text;
+}
+
+.calib {
+  padding: 16px 20px 20px;
+  color: var(--label);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.calib h1 {
+  margin: 0 0 12px;
+  color: var(--title);
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+}
+
+.calib h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.calib-step {
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--inset-bg);
+  border: 1px solid var(--inset-border);
+}
+
+.calib-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.calib-muted {
+  color: var(--caption);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.calib code {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.calib button,
+.calib select,
+.calib input {
+  font: 800 13px var(--font);
+  color: #fff;
+  background: #464e58;
+  border: 1px solid #5c636c;
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+.calib button {
+  cursor: pointer;
+}
+
+.calib button.selected {
+  border-color: #fff;
+}
+
+.calib button.primary {
+  background: #79b534;
+  border-color: #4d7a18;
+}
+
+.calib button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.calib label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.calib input {
+  width: 90px;
+  background: #2b3139;
+}
+
+.calib select {
+  max-width: 480px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 2px;
+}
+
+.calib-preview {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+  cursor: crosshair;
+  image-rendering: pixelated;
+  border: 1px solid var(--inset-border);
+}
+
+.calib-closeup {
+  margin: 0;
+}
+
+.calib-closeup canvas {
+  display: block;
+  image-rendering: pixelated;
+  border: 1px solid var(--inset-border);
+}
+
+.calib-closeup figcaption {
+  color: var(--caption);
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.calib-ok,
+.calib-error {
+  margin: 0 0 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.calib-ok {
+  background: #2e4a1a;
+  color: #d8f5b8;
+}
+
+.calib-error {
+  background: #5a1f1f;
+  color: #ffd6d6;
+}
+
+.calib-footer {
+  justify-content: flex-end;
+}
