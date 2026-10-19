@@ -48,3 +48,19 @@ pub fn render(text: &str, gap: u32) -> Bitmap {
     let rows: Vec<&str> = rows.iter().map(String::as_str).collect();
     Bitmap::from_ascii(&rows)
 }
+
+/// `render(text, 1)` as a grayscale crop: bright text on a dark background
+/// with a 1-pixel margin, the way a captured region looks.
+pub fn render_gray(text: &str) -> super::gray::Gray {
+    let b = render(text, 1);
+    let (w, h) = (b.width() + 2, b.height() + 2);
+    let mut data = vec![40u8; (w * h) as usize];
+    for y in 0..b.height() {
+        for x in 0..b.width() {
+            if b.get(x, y) {
+                data[((y + 1) * w + x + 1) as usize] = 230;
+            }
+        }
+    }
+    super::gray::Gray::new(w, h, data)
+}
