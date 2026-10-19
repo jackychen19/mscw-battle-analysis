@@ -12,7 +12,7 @@ mod line;
 mod notice;
 mod segment;
 #[cfg(test)]
-mod test_font;
+pub(crate) mod test_font;
 
 pub use bitmap::Bitmap;
 pub use exp::{ExpReader, exp_line, format_exp_text, level_line, parse_exp_text, parse_level_text};
