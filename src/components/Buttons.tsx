@@ -29,9 +29,8 @@ export function RoundButton({ label, children, ...rest }: { label: string; child
 
 export const icons = {
   gear: (
-    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round">
-      <circle cx="12" cy="12" r="3.2" />
-      <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1" />
+    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="currentColor" fillRule="evenodd" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round">
+      <path d="M19.11 9.32 L22.20 9.50 L22.20 14.50 L19.11 14.68 L18.92 15.14 L20.98 17.45 L17.45 20.98 L15.14 18.92 L14.68 19.11 L14.50 22.20 L9.50 22.20 L9.32 19.11 L8.86 18.92 L6.55 20.98 L3.02 17.45 L5.08 15.14 L4.89 14.68 L1.80 14.50 L1.80 9.50 L4.89 9.32 L5.08 8.86 L3.02 6.55 L6.55 3.02 L8.86 5.08 L9.32 4.89 L9.50 1.80 L14.50 1.80 L14.68 4.89 L15.14 5.08 L17.45 3.02 L20.98 6.55 L18.92 8.86Z M15.3 12a3.3 3.3 0 1 0 -6.6 0a3.3 3.3 0 1 0 6.6 0Z" />
     </svg>
   ),
   start: (
