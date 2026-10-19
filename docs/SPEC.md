@@ -24,7 +24,7 @@ Sections are self-contained; read only the one a task needs. Decisions made afte
 ## 3. Data sources
 
 1. **EXP (source of truth): the text above the EXP bar**, e.g. `EXP. 440,834 [38.43%]`, all one white color on a solid dark background. Crop only that text line, not the bar. Ignore the `EXP.` label. Also read the level number (bottom-left, `LV. 59`).
-2. **Mesos: the system notification stack in the bottom-right corner.** Lines read `You have gained mesos (+15)`. The newest line appears at the bottom; older lines move up and fade. This text sits directly over map art, so the background varies by map. Lines like `You received EXP (+78)` and `Bonus EXP for PARTY (+23)` also appear there. **Decided:** only meso lines are counted; EXP comes from the EXP bar text alone. Other lines are recognised by their opening words (amount not read) so they can anchor stack alignment.
+2. **Mesos (on hold, see §9): the system notification stack in the bottom-right corner.** Lines read `You have gained mesos (+15)`. The newest line appears at the bottom; older lines move up and fade. This text sits directly over map art, so the background varies by map. Lines like `You received EXP (+78)` and `Bonus EXP for PARTY (+23)` also appear there. **Decided:** only meso lines are counted; EXP comes from the EXP bar text alone. Other lines are recognised by their opening words (amount not read) so they can anchor stack alignment.
 
 ## 4. Reading text: template matching, not general OCR
 
@@ -83,17 +83,19 @@ There's a gameplay recording at `fixtures/video/grinding-01.mov`. ffmpeg is inst
 
 - Extract frames at 5 fps into `fixtures/frames/grinding-01/`.
 - Pick ~10 representative frames, show the user each one's EXP text crop and notification crop, and ask them to confirm the values before saving them as committed PNG fixtures with expected-values JSON.
-- Use the full frame sequence to test meso line alignment: the total counted mesos must match the pickups in the video, including duplicate amounts in a row.
+- Use the full frame sequence to test meso line alignment: the total counted mesos must match the pickups in the video, including duplicate amounts in a row. **On hold:** the reader and tracker work, but the clip's true pickup list was never confirmed (the tracker counts 2,498 mesos over 0–122 s).
 
 ## 9. Milestones
 
 Stop after each and summarize for review.
 
 1. **Scaffold + core logic** ✅: Tauri v2 project, `.gitignore`, Rust module layout (`capture`, `parse`, `stats`, `calibration`), the full stats engine with unit tests, and the UI rendering all three states from mock data. No capture yet.
-2. **Parser:** binarize/segment/template-match for the EXP text and notification lines, tested against fixtures and the test footage.
+2. **Parser** ✅ (EXP): binarize/segment/template-match for the EXP text and notification lines, tested against fixtures and the test footage. EXP reads every frame of grinding-01. Meso notification reading is done but on hold (see 5).
 3. **Live capture + calibration:** macOS `FrameSource`, Screen Recording permission flow, window picker, region drag + glyph-teaching calibration.
 4. **Floating panel:** always visible over the fullscreen game without stealing focus.
 5. **Mesos end-to-end + polish:** stack alignment wired to live capture, debug-crop mode, sessions saved to local history (JSON).
+
+**Mesos on hold (decided):** the notification stack is too noisy over map art (one kill adds 2–4 lines, top lines get lost) to trust without a confirmed ground truth. EXP comes first. An idea to revisit: have the user open the inventory at session start to read the meso total, then update the total whenever the inventory is open again. That reads one number on a solid background instead of following a moving stack.
 
 ## 10. README
 
