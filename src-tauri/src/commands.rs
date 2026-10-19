@@ -39,13 +39,13 @@ pub struct View {
 }
 
 impl AppState {
-    pub fn new(mock: bool, capture: CaptureStatus) -> Self {
+    pub fn new(mock: bool) -> Self {
         Self {
             origin: Instant::now(),
             session: Session::new(SessionConfig::default()),
             last_session: None,
             feed: mock.then(MockFeed::new),
-            capture,
+            capture: CaptureStatus { permission: capture::permission(), game: None, calibrated: false },
             auto_paused: false,
         }
     }

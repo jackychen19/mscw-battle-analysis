@@ -22,6 +22,8 @@ const MOCK_EVERY: Duration = Duration::from_millis(250);
 pub fn run() {
     let mock = std::env::var_os("BATTLE_MOCK").is_some_and(|v| v == "1");
     tauri::Builder::default()
+        // Managed before any window loads; the capturer needs the app's data dir, so it's added in setup.
+        .manage(Mutex::new(AppState::new(mock)))
         .invoke_handler(tauri::generate_handler![
             commands::get_view,
             commands::session_command,
@@ -39,9 +41,7 @@ pub fn run() {
             if let Some(main) = app.get_webview_window("main") {
                 BasicFloating.make_floating(&main)?;
             }
-            let capturer = Capturer::new(app.path().app_data_dir()?);
-            app.manage(Mutex::new(AppState::new(mock, capturer.status())));
-            app.manage(Mutex::new(capturer));
+            app.manage(Mutex::new(Capturer::new(app.path().app_data_dir()?)));
 
             let handle = app.handle().clone();
             thread::spawn(move || {
@@ -58,7 +58,7 @@ pub fn run() {
                     // Capture without holding the session lock, so the panel stays responsive.
                     let (status, tick) = {
                         let mut cap = cap.lock().unwrap();
-                        let tick = if recording { cap.tick() } else { cap.scan(false) ; None };
+                        let tick = if recording { cap.tick() } else { cap.scan(false); None };
                         (cap.status(), tick)
                     };
                     state.lock().unwrap().on_capture(status, tick);
