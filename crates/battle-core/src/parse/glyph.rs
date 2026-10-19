@@ -162,47 +162,78 @@ impl GlyphSet {
 }
 
 /// Normalized cross-correlation of two glyph images, aligned on their left
-/// edge. Tries vertical shifts of up to 2 px and horizontal shifts of up to
-/// 1.5 px in half-pixel steps: when the game is scaled by a non-integer
+/// edge. Searches vertical shifts of up to 2 px and horizontal shifts of up
+/// to 1.5 px in half-pixel steps: when the game is scaled by a non-integer
 /// factor, the same glyph renders differently depending on where it falls
 /// between pixels. Insensitive to overall brightness and contrast (fading
 /// lines). Areas outside an image count as that image's background (its
 /// darkest pixel). 1.0 is identical.
 pub fn similarity(a: &Gray, b: &Gray) -> f32 {
-    let w = a.width().max(b.width()) as i32;
-    let h = a.height().max(b.height()) as i32;
-    let (bg_a, bg_b) = (a.min(), b.min());
-    let px = |g: &Gray, bg: u8, x: i32, y: i32| -> f64 {
-        let inside = x >= 0 && y >= 0 && (x as u32) < g.width() && (y as u32) < g.height();
-        f64::from(if inside { g.get(x as u32, y as u32) } else { bg })
+    let w = a.width().max(b.width()) as usize;
+    let h = a.height().max(b.height()) as usize;
+    // Both images on one padded canvas (outside = their background), so the
+    // shifted comparisons below are plain array reads.
+    let (pa, pb) = (Padded::new(a, w, h), Padded::new(b, w, h));
+    let score = |dy: i32, half_dx: i32| ncc_shifted(&pa, &pb, w, h, dy, half_dx);
+    // Coarse to fine: vertical first, then horizontal, then vertical again.
+    let best_of = |candidates: &mut dyn Iterator<Item = (i32, i32)>| {
+        candidates.map(|(dy, dx)| (dy, dx, score(dy, dx))).max_by(|p, q| p.2.total_cmp(&q.2)).unwrap()
     };
-    let mut best = 0.0f64;
-    for dy in -2..=2 {
-        for half_dx in -3i32..=3 {
-            // b is sampled at x - half_dx/2: a blend of two columns for odd steps.
-            let (whole, frac) = (half_dx.div_euclid(2), if half_dx % 2 == 0 { 0.0 } else { 0.5 });
-            let (mut sa, mut sb, mut saa, mut sbb, mut sab, mut n) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
-            for y in -2..h + 2 {
-                for x in -2..w + 2 {
-                    let va = px(a, bg_a, x, y);
-                    let bx = x - whole;
-                    let vb = (1.0 - frac) * px(b, bg_b, bx, y - dy) + frac * px(b, bg_b, bx - 1, y - dy);
-                    sa += va;
-                    sb += vb;
-                    saa += va * va;
-                    sbb += vb * vb;
-                    sab += va * vb;
-                    n += 1.0;
-                }
-            }
-            let var_a = saa - sa * sa / n;
-            let var_b = sbb - sb * sb / n;
-            if var_a > 0.0 && var_b > 0.0 {
-                best = best.max((sab - sa * sb / n) / (var_a * var_b).sqrt());
+    let (dy, _, _) = best_of(&mut (-2..=2).map(|dy| (dy, 0)));
+    let (_, dx, _) = best_of(&mut (-3..=3).map(|dx| (dy, dx)));
+    let (_, _, best) = best_of(&mut (-2..=2).map(|dy| (dy, dx)));
+    best.max(0.0) as f32
+}
+
+/// Margin around the compared area: 2 px for the window, 2 more for shifts.
+const PAD: usize = 4;
+
+struct Padded {
+    stride: usize,
+    data: Vec<f32>,
+}
+
+impl Padded {
+    fn new(g: &Gray, w: usize, h: usize) -> Self {
+        let stride = w + 2 * PAD;
+        let bg = f32::from(g.min());
+        let mut data = vec![bg; stride * (h + 2 * PAD)];
+        for y in 0..g.height() as usize {
+            for x in 0..g.width() as usize {
+                data[(y + PAD) * stride + x + PAD] = f32::from(g.get(x as u32, y as u32));
             }
         }
+        Self { stride, data }
     }
-    best as f32
+
+    /// Pixel at canvas coordinates relative to the image origin.
+    fn at(&self, x: i32, y: i32) -> f32 {
+        self.data[(y + PAD as i32) as usize * self.stride + (x + PAD as i32) as usize]
+    }
+}
+
+/// NCC over the image area plus a 2 px margin, with `b` shifted down by `dy`
+/// and right by `half_dx / 2` pixels (odd steps blend two columns).
+fn ncc_shifted(a: &Padded, b: &Padded, w: usize, h: usize, dy: i32, half_dx: i32) -> f64 {
+    let (whole, frac) = (half_dx.div_euclid(2), if half_dx % 2 == 0 { 0.0 } else { 0.5 });
+    let (mut sa, mut sb, mut saa, mut sbb, mut sab) = (0.0f64, 0.0f64, 0.0f64, 0.0f64, 0.0f64);
+    let mut n = 0.0f64;
+    for y in -2..h as i32 + 2 {
+        for x in -2..w as i32 + 2 {
+            let va = f64::from(a.at(x, y));
+            let bx = x - whole;
+            let vb = f64::from((1.0 - frac) * b.at(bx, y - dy) + frac * b.at(bx - 1, y - dy));
+            sa += va;
+            sb += vb;
+            saa += va * va;
+            sbb += vb * vb;
+            sab += va * vb;
+            n += 1.0;
+        }
+    }
+    let var_a = saa - sa * sa / n;
+    let var_b = sbb - sb * sb / n;
+    if var_a > 0.0 && var_b > 0.0 { (sab - sa * sb / n) / (var_a * var_b).sqrt() } else { 0.0 }
 }
 
 #[cfg(test)]
