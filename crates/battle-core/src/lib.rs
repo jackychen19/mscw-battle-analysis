@@ -7,3 +7,4 @@
 pub mod calibration;
 pub mod capture;
 pub mod parse;
+pub mod stats;
