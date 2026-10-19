@@ -11,7 +11,7 @@ use std::io::BufReader;
 use std::path::Path;
 
 use battle_core::capture::Frame;
-use battle_core::parse::{Channel, ExpReader, Gray, TextLine, exp_line, level_line};
+use battle_core::parse::{Channel, ExpReader, Gray, TextLine, exp_line, level_line, similarity};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -47,6 +47,21 @@ fn main() {
     }
     let chars: String = reader.exp_glyphs.glyphs.iter().map(|g| g.ch).collect();
     eprintln!("exp templates: {chars:?}");
+
+    // `explain=N` (after the teach specs): top matches for each glyph of frame N.
+    if let Some(n) = std::env::var("EXPLAIN").ok().and_then(|v| v.parse::<u64>().ok()) {
+        let line = exp_line(&load(dir, "exp", n)).expect("ink");
+        for i in 0..line.glyphs.len() {
+            let glyph = line.glyph(i);
+            let mut scores: Vec<(char, f32)> =
+                reader.exp_glyphs.glyphs.iter().map(|t| (t.ch, similarity(&glyph, &t.image))).collect();
+            scores.sort_by(|a, b| b.1.total_cmp(&a.1));
+            scores.dedup_by_key(|s| s.0);
+            let top: Vec<String> = scores.iter().take(3).map(|(c, s)| format!("{c} {s:.3}")).collect();
+            println!("glyph {i:2} cols {:?}: {}", line.glyphs[i], top.join(" | "));
+        }
+        return;
+    }
 
     let (mut ok, mut total) = (0, 0);
     for n in 1.. {

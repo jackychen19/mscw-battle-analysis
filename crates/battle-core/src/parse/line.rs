@@ -2,14 +2,17 @@ use std::ops::Range;
 
 use super::bitmap::Bitmap;
 use super::gray::Gray;
+use crate::capture::RectPx;
 use super::segment::{column_runs, row_runs};
 
 
-/// One line of text, binarized, with its glyphs located.
+/// One line of text with its glyphs located: the binarized band (used to
+/// find glyphs) and the same band in grayscale (used to match them).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TextLine {
     /// The line's rows only (the band holding most of the ink).
     pub bitmap: Bitmap,
+    pub gray: Gray,
     /// Column span of each glyph, left to right.
     pub glyphs: Vec<Range<u32>>,
 }
@@ -20,7 +23,8 @@ impl TextLine {
         let rows = bitmap.ink_rows()?;
         let bitmap = bitmap.crop(0, rows.start, bitmap.width(), rows.end - rows.start);
         let glyphs = column_runs(&bitmap);
-        Some(Self { bitmap, glyphs })
+        let gray = Gray::from_bitmap(&bitmap, 255, 0);
+        Some(Self { bitmap, gray, glyphs })
     }
 
     /// Binarizes a single-line crop and finds its glyphs.
@@ -45,11 +49,13 @@ impl TextLine {
         let low = crop(&low);
         let high = crop(&gray.binarize(core));
         let glyphs = split_on_cores(&low, &high);
-        Some(Self { bitmap: low, glyphs })
+        let gray = gray.crop(RectPx { x: 0, y: rows.start, w: gray.width(), h: rows.end - rows.start });
+        Some(Self { bitmap: low, gray, glyphs })
     }
 
-    pub fn glyph(&self, i: usize) -> Bitmap {
-        self.bitmap.crop_columns(self.glyphs[i].clone())
+    /// Grayscale image of glyph `i`.
+    pub fn glyph(&self, i: usize) -> Gray {
+        self.gray.crop_columns(self.glyphs[i].clone())
     }
 }
 

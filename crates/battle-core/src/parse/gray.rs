@@ -1,3 +1,7 @@
+use std::ops::Range;
+
+use serde::{Deserialize, Serialize};
+
 use crate::capture::{Frame, RectPx};
 
 use super::bitmap::Bitmap;
@@ -12,8 +16,10 @@ pub enum Channel {
     Min,
 }
 
-/// 8-bit single-channel image.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// 8-bit single-channel image. Serialized as rows of hex bytes so glyph
+/// templates in calibration files stay compact and diffable.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(into = "GrayRows", try_from = "GrayRows")]
 pub struct Gray {
     width: u32,
     height: u32,
@@ -47,6 +53,15 @@ impl Gray {
         Self::from_rgba(frame.width, frame.height, frame.stride, &frame.rgba, channel)
     }
 
+    /// Ink pixels become `ink`, the rest `background`.
+    pub fn from_bitmap(b: &Bitmap, ink: u8, background: u8) -> Self {
+        let data = (0..b.height())
+            .flat_map(|y| (0..b.width()).map(move |x| (x, y)))
+            .map(|(x, y)| if b.get(x, y) { ink } else { background })
+            .collect();
+        Self { width: b.width(), height: b.height(), data }
+    }
+
     pub fn width(&self) -> u32 {
         self.width
     }
@@ -71,6 +86,14 @@ impl Gray {
             data.extend_from_slice(&self.data[start..start + (x1 - x0) as usize]);
         }
         Gray { width: x1 - x0, height: y1 - y0, data }
+    }
+
+    pub fn crop_columns(&self, cols: Range<u32>) -> Gray {
+        self.crop(RectPx { x: cols.start, y: 0, w: cols.end - cols.start, h: self.height })
+    }
+
+    pub fn min(&self) -> u8 {
+        self.data.iter().copied().min().unwrap_or(0)
     }
 
     /// Pixels brighter than `threshold` become ink.
@@ -150,6 +173,45 @@ impl Gray {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+struct GrayRows {
+    width: u32,
+    height: u32,
+    rows: Vec<String>,
+}
+
+impl From<Gray> for GrayRows {
+    fn from(g: Gray) -> Self {
+        let rows = g
+            .data
+            .chunks(g.width.max(1) as usize)
+            .take(g.height as usize)
+            .map(|row| row.iter().map(|v| format!("{v:02x}")).collect())
+            .collect();
+        Self { width: g.width, height: g.height, rows }
+    }
+}
+
+impl TryFrom<GrayRows> for Gray {
+    type Error = String;
+
+    fn try_from(r: GrayRows) -> Result<Self, Self::Error> {
+        let mut data = Vec::with_capacity(r.width as usize * r.height as usize);
+        for row in &r.rows {
+            if row.len() != r.width as usize * 2 {
+                return Err(format!("gray row length does not match width {}", r.width));
+            }
+            for i in (0..row.len()).step_by(2) {
+                data.push(u8::from_str_radix(&row[i..i + 2], 16).map_err(|e| e.to_string())?);
+            }
+        }
+        if r.rows.len() != r.height as usize {
+            return Err(format!("expected {} gray rows", r.height));
+        }
+        Ok(Gray { width: r.width, height: r.height, data })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -180,6 +242,15 @@ mod tests {
         assert_eq!(g.binarize(150).to_ascii(), vec![".##.", "...."]);
         assert_eq!(g.crop(RectPx { x: 1, y: 0, w: 9, h: 1 }).width(), 3);
         assert_eq!(g.mean_under(&Bitmap::from_ascii(&[".##.", "..#."])), ((220 + 220 + 120) / 3) as u8);
+    }
+
+    #[test]
+    fn serializes_as_hex_rows() {
+        let g = Gray::new(2, 2, vec![0, 255, 16, 1]);
+        let json = serde_json::to_string(&g).unwrap();
+        assert_eq!(json, r#"{"width":2,"height":2,"rows":["00ff","1001"]}"#);
+        assert_eq!(serde_json::from_str::<Gray>(&json).unwrap(), g);
+        assert!(serde_json::from_str::<Gray>(r#"{"width":2,"height":1,"rows":["00"]}"#).is_err());
     }
 
     #[test]
