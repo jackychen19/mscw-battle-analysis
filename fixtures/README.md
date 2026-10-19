@@ -27,6 +27,8 @@ One set per recording, named after the frame number at 5 fps (frame N is at (Nâˆ
 
 Notification lines are listed top to bottom.
 
+`bar-0465.png` is the bottom status bar of frame 465 (video pixels 1260,1820 to 3400,1990), for finding the EXP text and level with no calibration. Its readings are the ones confirmed for `0465.json`. The streamer's overlay on the right shows a second LV/EXP readout, which the finder must ignore.
+
 ### grinding-01
 
 A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, Sleepy Dungeon), so the text is scaled by a non-integer factor and video-compressed: a harder case than a native capture. Only 0â€“122 s is used; after that the browser window moves.

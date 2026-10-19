@@ -7,8 +7,8 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 use battle_core::capture::Frame;
-use battle_core::parse::{NoticeReader, StackLayout};
-use battle_core::stats::LineKind;
+use battle_core::parse::{ExpReader, NoticeReader, StackLayout};
+use battle_core::stats::{ExpReading, LineKind};
 use serde_json::Value;
 
 pub fn fixtures_dir() -> PathBuf {
@@ -98,6 +98,27 @@ pub fn notice_reader() -> NoticeReader {
             .map(|l| clean(l).then(|| Some((kind(l)?, l["amount"].as_u64()?))).flatten())
             .collect();
         reader.teach(&f.crop("notif"), &lines).unwrap_or_else(|e| panic!("teach {frame}: {e}"));
+    }
+    reader
+}
+
+/// EXP frames used for calibration; the rest are held out.
+pub const EXP_TEACH: [u32; 6] = [1, 29, 114, 300, 465, 600];
+
+pub fn expected_exp(f: &Fixture) -> ExpReading {
+    let e = &f.expected["exp"];
+    let n = |k: &str| e[k].as_u64().unwrap();
+    ExpReading::new(n("level") as u32, n("exp"), n("pctHundredths") as u32)
+}
+
+/// The EXP reader taught from [`EXP_TEACH`].
+pub fn exp_reader() -> ExpReader {
+    let mut reader = ExpReader::default();
+    for frame in EXP_TEACH {
+        let f = Fixture::load("grinding-01", frame);
+        let want = expected_exp(&f);
+        reader.teach_exp(&f.crop("exp"), want.exp, want.pct_hundredths).unwrap();
+        reader.teach_level(&f.crop("level"), want.level).unwrap();
     }
     reader
 }

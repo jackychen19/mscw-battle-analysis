@@ -6,24 +6,12 @@ use battle_core::parse::ExpReader;
 use battle_core::stats::ExpReading;
 use common::Fixture;
 
-/// Frames used for calibration; the rest are held out.
-const TEACH: [u32; 6] = [1, 29, 114, 300, 465, 600];
-
 fn expected(f: &Fixture) -> ExpReading {
-    let e = &f.expected["exp"];
-    let n = |k: &str| e[k].as_u64().unwrap();
-    ExpReading::new(n("level") as u32, n("exp"), n("pctHundredths") as u32)
+    common::expected_exp(f)
 }
 
 fn taught() -> ExpReader {
-    let mut reader = ExpReader::default();
-    for frame in TEACH {
-        let f = Fixture::load("grinding-01", frame);
-        let want = expected(&f);
-        reader.teach_exp(&f.crop("exp"), want.exp, want.pct_hundredths).unwrap();
-        reader.teach_level(&f.crop("level"), want.level).unwrap();
-    }
-    reader
+    common::exp_reader()
 }
 
 #[test]
@@ -41,7 +29,7 @@ fn reads_every_fixture_frame() {
 fn held_out_frames_cover_every_digit() {
     let held_out: String = Fixture::all("grinding-01")
         .iter()
-        .filter(|f| !TEACH.contains(&f.frame))
+        .filter(|f| !common::EXP_TEACH.contains(&f.frame))
         .map(|f| expected(f).exp.to_string())
         .collect();
     let missing: Vec<char> = ('0'..='9').filter(|d| !held_out.contains(*d)).collect();

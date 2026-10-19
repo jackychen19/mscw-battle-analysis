@@ -129,7 +129,7 @@ fn mirrored(g: &Gray) -> Gray {
 
 /// Glyph indices of the rightmost word: glyphs since the last gap clearly
 /// wider than the usual letter spacing (drops an `EXP.` label).
-fn last_word(glyphs: &[std::ops::Range<u32>]) -> std::ops::Range<usize> {
+pub(super) fn last_word(glyphs: &[std::ops::Range<u32>]) -> std::ops::Range<usize> {
     let gaps: Vec<u32> = glyphs.windows(2).map(|w| w[1].start - w[0].end).collect();
     let mut sorted = gaps.clone();
     sorted.sort_unstable();
