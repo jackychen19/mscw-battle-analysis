@@ -13,7 +13,7 @@ use tauri::Manager;
 
 use commands::AppState;
 use live::Capturer;
-use window::{BasicFloating, FloatingWindow};
+use window::FloatingWindow;
 
 /// EXP region capture rate (~2 fps).
 const CAPTURE_EVERY: Duration = Duration::from_millis(500);
@@ -21,6 +21,8 @@ const MOCK_EVERY: Duration = Duration::from_millis(250);
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    #[cfg(all(target_os = "macos", debug_assertions))]
+    window::log_objc_exceptions();
     let mock = std::env::var_os("BATTLE_MOCK").is_some_and(|v| v == "1");
     tauri::Builder::default()
         // Managed before any window loads; the capturer needs the app's data dir, so it's added in setup.
@@ -39,8 +41,14 @@ pub fn run() {
             commands::reset_calibration,
         ])
         .setup(move |app| {
+            // An accessory app (no Dock icon) can put its panel over another app's fullscreen Space.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             if let Some(main) = app.get_webview_window("main") {
-                BasicFloating.make_floating(&main)?;
+                #[cfg(target_os = "macos")]
+                window::MacPanel.make_floating(&main)?;
+                #[cfg(not(target_os = "macos"))]
+                window::BasicFloating.make_floating(&main)?;
             }
             let data_dir = app.path().app_data_dir()?;
             app.state::<Mutex<AppState>>().lock().unwrap().set_history_dir(data_dir.clone());
