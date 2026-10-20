@@ -4,7 +4,7 @@
 //! every sample's EXP ÷ percent gives the same level max.
 
 use crate::capture::Frame;
-use crate::parse::{GlyphSet, GlyphTemplate, Gray, exp_line, similarity};
+use crate::parse::{ExpInk, GlyphSet, GlyphTemplate, Gray, exp_line_with, similarity};
 
 /// Two glyphs at least this similar are the same character. A direct window
 /// capture draws a character identically every time (≈1.0), while different
@@ -45,12 +45,22 @@ pub struct ExpFontLearner {
     /// Member images per group; the first is the representative.
     groups: Vec<Vec<Gray>>,
     samples: Vec<Vec<usize>>,
+    ink: ExpInk,
 }
 
 impl ExpFontLearner {
+    /// A learner for crops whose ink is told apart as `ink`.
+    pub fn with_ink(ink: ExpInk) -> Self {
+        Self { ink, ..Self::default() }
+    }
+
+    pub fn ink(&self) -> ExpInk {
+        self.ink
+    }
+
     /// Adds one EXP crop. Returns false if no text line was found.
     pub fn add(&mut self, crop: &Frame) -> bool {
-        let Some(line) = exp_line(crop) else { return false };
+        let Some(line) = exp_line_with(crop, self.ink) else { return false };
         let word = last_word(&line.glyphs);
         let ids: Vec<usize> = word.map(|i| self.group_of(line.glyph(i))).collect();
         if ids.len() < 8 {

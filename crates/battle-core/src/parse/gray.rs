@@ -162,6 +162,12 @@ impl Gray {
         best + (best_end - best) / 2
     }
 
+    /// Mean brightness of the pixels no brighter than `t`, 0 if none.
+    pub fn mean_at_most(&self, t: u8) -> u8 {
+        let (sum, n) = self.data.iter().filter(|&&v| v <= t).fold((0u64, 0u64), |(s, n), &v| (s + u64::from(v), n + 1));
+        sum.checked_div(n).map_or(0, |m| m as u8)
+    }
+
     /// Mean brightness of the pixels that are ink in `mask`, 0 if none.
     pub fn mean_under(&self, mask: &Bitmap) -> u8 {
         let (mut sum, mut n) = (0u64, 0u64);

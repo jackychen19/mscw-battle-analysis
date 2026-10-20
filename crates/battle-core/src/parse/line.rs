@@ -42,7 +42,12 @@ impl TextLine {
 
     /// [`TextLine::from_gray`] with an explicit ink threshold `t`.
     pub fn from_gray_at(gray: &Gray, t: u8) -> Option<Self> {
-        let core = t + (gray.max() - t) / 3;
+        Self::from_gray_cores(gray, t, t + (gray.max() - t) / 3)
+    }
+
+    /// [`TextLine::from_gray_at`], splitting touching glyphs where pixels
+    /// brighter than `core` (their cores) separate.
+    pub fn from_gray_cores(gray: &Gray, t: u8, core: u8) -> Option<Self> {
         let low = gray.binarize(t);
         let rows = main_band(&low)?;
         let crop = |b: &Bitmap| b.crop(0, rows.start, b.width(), rows.end - rows.start);

@@ -12,7 +12,7 @@ pub use learn::{ExpFontLearner, NEEDED_SAMPLES};
 use std::fmt;
 
 use crate::capture::{Frame, RectPt, WindowInfo};
-use crate::parse::{ExpReader, GlyphSet, TeachError};
+use crate::parse::{ExpInk, ExpReader, GlyphSet, TeachError};
 
 pub const CALIBRATION_VERSION: u32 = 2;
 
@@ -100,6 +100,9 @@ impl WindowMatch {
 pub struct Regions {
     pub exp_text: RectPt,
     pub level: RectPt,
+    /// How sharp the EXP text is in this window (set by the status bar search).
+    #[serde(default)]
+    pub ink: ExpInk,
 }
 
 /// Smaller than this (points) is a launcher or dialog, not the game.
@@ -257,7 +260,11 @@ mod tests {
         let mut exp = ExpReader::default();
         exp.teach_exp(&render_frame("440,834[38.43%]"), 440_834, 3843).unwrap();
         exp.teach_level(&render_frame("59"), 59).unwrap();
-        let regions = Regions { exp_text: RectPt { x: 0.0, y: 0.0, w: 1.0, h: 1.0 }, level: RectPt { x: 0.0, y: 0.0, w: 1.0, h: 1.0 } };
+        let regions = Regions {
+            exp_text: RectPt { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
+            level: RectPt { x: 0.0, y: 0.0, w: 1.0, h: 1.0 },
+            ink: ExpInk::Otsu,
+        };
         let cal = Calibration::new(&window(1, "MapleStory", "MapleStory", 1.0, 1.0), regions, exp);
         assert_eq!(cal.missing(), Missing { exp: "125679".into(), level: "01234678".into() });
         assert!(cal.fits_scale(2.0));
@@ -299,6 +306,7 @@ mod tests {
     const BOXES: Regions = Regions {
         exp_text: RectPt { x: 0.0, y: 0.0, w: 200.0, h: 9.0 },
         level: RectPt { x: 0.0, y: 20.0, w: 50.0, h: 9.0 },
+        ink: ExpInk::Otsu,
     };
 
     #[test]

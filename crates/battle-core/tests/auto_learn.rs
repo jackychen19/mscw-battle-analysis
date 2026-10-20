@@ -4,7 +4,7 @@ mod common;
 
 use battle_core::calibration::{ExpFontLearner, find_exp_text, find_level, find_level_near, find_regions};
 use battle_core::capture::{RectPt, RectPx};
-use battle_core::parse::ExpReader;
+use battle_core::parse::{ExpInk, ExpReader};
 use common::Fixture;
 
 #[test]
@@ -117,6 +117,23 @@ fn finds_exp_and_level_on_a_native_capture() {
     let exp = find_exp_text(&bar).expect("EXP line");
     let level = find_level_near(&bar, exp).expect("level");
     assert_eq!(ExpReader::default().read_level(&bar.crop(level)), Some(33));
+}
+
+#[test]
+fn finds_exp_and_level_on_a_stretched_fullscreen_game() {
+    // Lv 34, EXP 50,182 [32.26%]: the game draws 1920x1080 and macOS stretches
+    // it to a 3836x2154 display with smoothing. Otsu's split cuts the soft
+    // glyphs into slivers, so the search must settle on the softer threshold.
+    let bar = common::load_png(&common::fixtures_dir().join("fullscreen-01/bar.png"));
+    let area = RectPt { x: 0.0, y: 0.0, w: f64::from(bar.width), h: f64::from(bar.height) };
+    let regions = find_regions(&bar, area, 1.0).expect("EXP text and level");
+    assert_eq!(regions.ink, ExpInk::Soft);
+    // Taught from this one crop, it reads back: every glyph was cut out whole.
+    let exp = bar.crop(regions.exp_text.to_px(1.0));
+    let mut reader = ExpReader { ink: ExpInk::Soft, ..ExpReader::default() };
+    reader.teach_exp(&exp, 50_182, 3226).expect("glyphs line up with the text");
+    assert_eq!(reader.read_exp(&exp), Some((50_182, 3226)));
+    assert_eq!(ExpReader::default().read_level(&bar.crop(regions.level.to_px(1.0))), Some(34));
 }
 
 #[test]

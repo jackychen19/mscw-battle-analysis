@@ -41,6 +41,10 @@ A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, 
 
 `bar.png`: the same, at Lv 34, EXP 27,066 [17.40%]. Its `4` (closed, slanted top) was once read as `8`.
 
+### fullscreen-01
+
+`bar.png`: the status bar cut from a macOS screenshot of the game in fullscreen (Lv 34, EXP 50,182 [32.26%]). The game draws 1920x1080 and macOS stretches it 1.998x to a 3836x2154 display with smoothing, so the text is soft: Otsu's split cuts its glyphs apart.
+
 ## Never committed (gitignored)
 
 - `video/`: gameplay recordings.

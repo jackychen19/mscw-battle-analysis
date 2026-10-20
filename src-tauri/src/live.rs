@@ -8,7 +8,7 @@ use battle_core::calibration::{
     Calibration, EXP_CHARS, ExpFontLearner, Missing, NEEDED_SAMPLES, Regions, Sample, SampleError, WindowMatch,
     find_exp_text, find_game_window, find_level_near, find_regions, missing_chars, teach_sample,
 };
-use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, RectPx, WindowInfo};
+use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
 use battle_core::parse::ExpReader;
 use battle_core::stats::Observation;
 use serde::Serialize;
@@ -20,6 +20,8 @@ const SCAN_EVERY: Duration = Duration::from_secs(2);
 const CALIBRATION_FILE: &str = "calibration.json";
 /// How often to look for the EXP text and level again while they're not found.
 const LOCATE_EVERY: Duration = Duration::from_secs(3);
+/// Shares of the window height searched for the status bar, bottom up.
+const LOCATE_BANDS: [f64; 4] = [0.125, 0.25, 0.5, 1.0];
 /// Distinct samples without a solution before the boxes are looked for again.
 const RELOCATE_AFTER: usize = 24;
 
@@ -198,6 +200,10 @@ impl Capturer {
                 None => return,
             },
         };
+        if self.auto.learner.ink() != regions.ink {
+            // Samples split at another threshold don't group with these.
+            self.auto.learner = ExpFontLearner::with_ink(regions.ink);
+        }
         let Ok(crop) = self.capture(regions.exp_text) else { return };
         let before = self.auto.learner.sample_count();
         if !self.auto.learner.add(&crop) || self.auto.learner.sample_count() == before {
@@ -214,7 +220,7 @@ impl Capturer {
             return;
         }
         // No level templates: the level's blocky digits are read by shape.
-        let reader = ExpReader { exp_glyphs: font, ..ExpReader::default() };
+        let reader = ExpReader { exp_glyphs: font, ink: regions.ink, ..ExpReader::default() };
         let cal = Calibration::new(&game, regions, reader);
         if save(&self.dir, &cal).is_ok() {
             self.calibration = Some(cal);
@@ -230,27 +236,34 @@ impl Capturer {
             return None;
         }
         self.auto.last_locate = Some(now);
-        // The whole window: its reported size doesn't always match where the
-        // game draws, so the status bar can't be assumed to be at the bottom.
-        let area = RectPt { x: 0.0, y: 0.0, w: game.bounds.w, h: game.bounds.h };
-        let strip = match self.capture(area) {
-            Ok(s) => s,
-            Err(e) => {
-                eprintln!("[locate] capture of {area:?} failed: {e}");
-                return None;
+        // The status bar is drawn at the bottom, so search upward from there in
+        // growing bands. The window's reported size doesn't always match where
+        // the game draws, so the last band is the whole window.
+        let (area, strip) = LOCATE_BANDS.iter().find_map(|&share| {
+            let h = game.bounds.h * share;
+            let area = RectPt { x: 0.0, y: game.bounds.h - h, w: game.bounds.w, h };
+            let strip = match self.capture(area) {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[locate] capture of {area:?} failed: {e}");
+                    return None;
+                }
+            };
+            let exp = find_exp_text(&strip);
+            let lvl = exp.and_then(|e| find_level_near(&strip, e));
+            eprintln!(
+                "[locate] window {}x{} pt @{}x, bottom {:.0}%: strip {}x{} px: exp {exp:?}, level {lvl:?}",
+                game.bounds.w, game.bounds.h, game.scale, share * 100.0, strip.width, strip.height
+            );
+            if lvl.is_some() {
+                return Some((area, strip));
             }
-        };
-        let exp = find_exp_text(&strip);
-        let lvl = exp.and_then(|e| find_level_near(&strip, e));
-        if exp.is_none() || lvl.is_none() {
-            // Only the bottom of the window (where the status bar is drawn), never the whole frame.
-            let h = strip.height * 3 / 10;
-            save_debug_crop("locate-bottom", &strip.crop(RectPx { x: 0, y: strip.height - h, w: strip.width, h }));
-        }
-        eprintln!(
-            "[locate] window {}x{} pt @{}x, strip {}x{} px: exp {exp:?}, level {lvl:?}",
-            game.bounds.w, game.bounds.h, game.scale, strip.width, strip.height
-        );
+            if share == LOCATE_BANDS[0] {
+                // Only the bottom of the window (where the status bar is drawn), never the whole frame.
+                save_debug_crop("locate-bottom", &strip);
+            }
+            None
+        })?;
         let regions = find_regions(&strip, area, game.scale)?;
         let level = self.capture(regions.level).ok()?;
         let read = ExpReader::default().read_level(&level);

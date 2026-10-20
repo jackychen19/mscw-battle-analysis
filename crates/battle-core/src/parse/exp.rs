@@ -15,11 +15,19 @@ pub struct ExpReader {
     pub exp_glyphs: GlyphSet,
     pub level_glyphs: GlyphSet,
     pub min_score: f32,
+    /// How the EXP line's ink is told from its background in this window.
+    #[serde(default)]
+    pub ink: ExpInk,
 }
 
 impl Default for ExpReader {
     fn default() -> Self {
-        Self { exp_glyphs: GlyphSet::default(), level_glyphs: GlyphSet::default(), min_score: DEFAULT_MIN_SCORE }
+        Self {
+            exp_glyphs: GlyphSet::default(),
+            level_glyphs: GlyphSet::default(),
+            min_score: DEFAULT_MIN_SCORE,
+            ink: ExpInk::default(),
+        }
     }
 }
 
@@ -28,7 +36,7 @@ impl ExpReader {
     /// Returns the column where the number starts (anything left of it, like
     /// the `EXP.` label, should be cropped off from then on).
     pub fn teach_exp(&mut self, crop: &Frame, exp: u64, pct_hundredths: u32) -> Result<u32, TeachError> {
-        let line = exp_line(crop).ok_or(TeachError::NoInk)?;
+        let line = exp_line_with(crop, self.ink).ok_or(TeachError::NoInk)?;
         self.exp_glyphs.teach(&line, &format_exp_text(exp, pct_hundredths))
     }
 
@@ -47,7 +55,7 @@ impl ExpReader {
     }
 
     pub fn read_exp(&self, crop: &Frame) -> Option<(u64, u32)> {
-        let line = exp_line(crop)?;
+        let line = exp_line_with(crop, self.ink)?;
         parse_exp_text(&self.exp_glyphs.read(&line, self.min_score)?.text)
     }
 
@@ -61,9 +69,40 @@ impl ExpReader {
     }
 }
 
-/// White digits with yellow-green brackets on a dark bar.
+/// Where the EXP line's ink starts. Every capture of one game window is
+/// equally sharp or soft, so the status bar search picks one per window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ExpInk {
+    /// Otsu's split: crisp text, as a windowed game draws it.
+    #[default]
+    Otsu,
+    /// Otsu's split, but glyph cores (where touching glyphs are cut apart)
+    /// start lower. A fullscreen game is stretched to the display with
+    /// smoothing (1920x1080 on 3836x2154 is 1.998x), and a soft glyph's
+    /// brightest parts are separate (a `0`'s two sides): with the usual cores
+    /// it would be cut into slivers.
+    Soft,
+}
+
+/// White digits with yellow-green brackets on a dark bar, crisp.
 pub fn exp_line(crop: &Frame) -> Option<TextLine> {
-    TextLine::from_gray(&Gray::from_frame(crop, Channel::Luma))
+    exp_line_with(crop, ExpInk::Otsu)
+}
+
+/// [`exp_line`] with the ink threshold `ink`.
+pub fn exp_line_with(crop: &Frame, ink: ExpInk) -> Option<TextLine> {
+    let gray = Gray::from_frame(crop, Channel::Luma);
+    let otsu = gray.otsu_threshold();
+    match ink {
+        ExpInk::Otsu => TextLine::from_gray_at(&gray, otsu),
+        ExpInk::Soft => {
+            // As high above halfway between the background and Otsu's split
+            // as the usual cores are above Otsu's.
+            let mid = gray.mean_at_most(otsu).midpoint(otsu);
+            TextLine::from_gray_cores(&gray, otsu, mid + (gray.max() - mid) / 3)
+        }
+    }
 }
 
 /// White digits on orange tiles over a dark bar: three tones, so threshold

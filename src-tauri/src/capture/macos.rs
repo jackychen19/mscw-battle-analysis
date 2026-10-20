@@ -175,7 +175,7 @@ mod tests {
         let game = src.select_window(game.id).unwrap();
         let area = RectPt { x: 0.0, y: 0.0, w: game.bounds.w, h: game.bounds.h };
         let regions = find_regions(&src.capture_region(area).unwrap(), area, game.scale).expect("regions");
-        let mut learner = ExpFontLearner::default();
+        let mut learner = ExpFontLearner::with_ink(regions.ink);
         let start = std::time::Instant::now();
         while start.elapsed() < std::time::Duration::from_secs(60) {
             let crop = src.capture_region(regions.exp_text).unwrap();
@@ -186,7 +186,7 @@ mod tests {
                 let solved = learner.solve();
                 println!("{:>4.1}s: {} samples, solve took {:?}: {}", start.elapsed().as_secs_f32(), learner.sample_count(), t.elapsed(), solved.is_some());
                 if let Some(font) = solved {
-                    let reader = ExpReader { exp_glyphs: font, ..ExpReader::default() };
+                    let reader = ExpReader { exp_glyphs: font, ink: regions.ink, ..ExpReader::default() };
                     let level = src.capture_region(regions.level).unwrap();
                     println!("reads: {:?}", reader.read(&src.capture_region(regions.exp_text).unwrap(), &level));
                     return;

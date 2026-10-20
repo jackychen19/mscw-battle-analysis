@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use super::Regions;
 use crate::capture::{Frame, RectPt, RectPx};
-use crate::parse::{Channel, Gray, TextLine, exp_line, similarity};
+use crate::parse::{Channel, ExpInk, Gray, TextLine, exp_line_with, similarity};
 
 /// Pixels at least this bright can be the white text.
 const TEXT_LUMA: u8 = 150;
@@ -72,6 +72,13 @@ fn blobs(width: u32, height: u32, ink: impl Fn(u32, u32) -> bool) -> Vec<Blob> {
 /// The EXP text (number through `]`, label excluded) in `frame`, with room
 /// on the right for the number to grow.
 pub fn find_exp_text(frame: &Frame) -> Option<RectPx> {
+    find_exp(frame).map(|(r, _)| r)
+}
+
+/// [`find_exp_text`] and the ink threshold its layout checked out with:
+/// Otsu's for crisp text, the softer one for a fullscreen game stretched to
+/// the display.
+fn find_exp(frame: &Frame) -> Option<(RectPx, ExpInk)> {
     let gray = Gray::from_frame(frame, Channel::Luma);
     let glyphs: Vec<Blob> = blobs(gray.width(), gray.height(), |x, y| gray.get(x, y) >= TEXT_LUMA)
         .into_iter()
@@ -79,10 +86,10 @@ pub fn find_exp_text(frame: &Frame) -> Option<RectPx> {
         .collect();
     // HP and MP have brackets too but not the percent layout; if several
     // rows qualify, the lowest, rightmost one is the status bar's.
-    lines(&glyphs)
-        .iter()
-        .filter_map(|line| exp_in_line(frame, line))
-        .max_by_key(|r| (r.y, r.x))
+    let rows = lines(&glyphs);
+    [ExpInk::Otsu, ExpInk::Soft].into_iter().find_map(|ink| {
+        rows.iter().filter_map(|line| exp_in_line(frame, line, ink)).max_by_key(|r| (r.y, r.x)).map(|r| (r, ink))
+    })
 }
 
 /// Chains of bright blobs left to right that sit on one text row. Blur can
@@ -117,7 +124,7 @@ fn ink_rows(line: &TextLine, run: &Range<u32>) -> Range<u32> {
     b.ink_rows().unwrap_or(0..0)
 }
 
-fn exp_in_line(frame: &Frame, chain: &[Blob]) -> Option<RectPx> {
+fn exp_in_line(frame: &Frame, chain: &[Blob], ink: ExpInk) -> Option<RectPx> {
     let top = chain.iter().map(|b| b.y0).min()?;
     let bottom = chain.iter().map(|b| b.y1).max()?;
     let height = bottom - top;
@@ -128,7 +135,7 @@ fn exp_in_line(frame: &Frame, chain: &[Blob]) -> Option<RectPx> {
     let y0 = top.saturating_sub(margin);
     // The EXP gauge starts right under the text: no margin below.
     let area = RectPx { x: left, y: y0, w: right - left, h: (bottom + 1).min(frame.height) - y0 };
-    let line = exp_line(&frame.crop(area))?;
+    let line = exp_line_with(&frame.crop(area), ink)?;
     words(&line.glyphs).into_iter().find_map(|word| exp_in_word(frame, area, &line, word))
 }
 
@@ -221,8 +228,8 @@ pub fn find_regions(strip: &Frame, area: RectPt, scale: f64) -> Option<Regions> 
         w: f64::from(r.w) / scale,
         h: f64::from(r.h) / scale,
     };
-    let exp = find_exp_text(strip)?;
-    Some(Regions { exp_text: to_pt(exp), level: to_pt(find_level_near(strip, exp)?) })
+    let (exp, ink) = find_exp(strip)?;
+    Some(Regions { exp_text: to_pt(exp), level: to_pt(find_level_near(strip, exp)?), ink })
 }
 
 fn orange(p: [u8; 4]) -> bool {
