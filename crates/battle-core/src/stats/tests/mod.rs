@@ -2,6 +2,7 @@
 
 mod exp;
 mod meso;
+mod record;
 mod session;
 
 use super::*;

@@ -6,6 +6,7 @@ use super::filter::ReadingFilter;
 use super::level::{LevelTable, MaxEstimator};
 use super::meso_track::{DEFAULT_FRESHNESS_TOLERANCE, MesoTracker};
 use super::reading::{ExpReading, Line};
+use super::record::{LevelUp, RECORD_VERSION, SessionRecord};
 use super::rolling::{DEFAULT_ROLLING_WINDOW_MS, Rolling, per_min};
 use super::snapshot::Snapshot;
 
@@ -94,6 +95,13 @@ pub struct Session {
     paused_before_ms: u64,
     pause_start_ms: Option<u64>,
     rolling: Rolling,
+
+    started_ms: Option<u64>,
+    stopped_ms: Option<u64>,
+    level_ups: Vec<LevelUp>,
+    exp_by_minute: Vec<u64>,
+    /// EXP gained as of the previous observation (for minute boundaries).
+    minute_total: u64,
 }
 
 impl Session {
@@ -116,6 +124,11 @@ impl Session {
             paused_before_ms: 0,
             pause_start_ms: None,
             rolling: Rolling::new(config.rolling_window_ms),
+            started_ms: None,
+            stopped_ms: None,
+            level_ups: Vec::new(),
+            exp_by_minute: Vec::new(),
+            minute_total: 0,
         }
     }
 
@@ -127,12 +140,14 @@ impl Session {
         use SessionState::*;
         match (self.state, command) {
             (Idle, Command::Start) => {
+                self.started_ms = Some(t_ms);
                 self.segment_start_ms = Some(t_ms);
                 self.rolling.record(0, 0, 0);
                 self.begin_segment();
                 self.state = Recording;
             }
             (Recording, Command::Pause) => {
+                self.track_minutes(t_ms);
                 self.close_segment(t_ms);
                 self.pause_start_ms = Some(t_ms);
                 self.state = Paused;
@@ -144,6 +159,8 @@ impl Session {
                 self.state = Recording;
             }
             (Recording | Paused, Command::Stop) => {
+                self.track_minutes(t_ms);
+                self.stopped_ms = Some(t_ms);
                 self.close_segment(t_ms);
                 self.close_pause(t_ms);
                 self.state = Stopped;
@@ -170,7 +187,7 @@ impl Session {
         match observation {
             Observation::Exp(raw) => {
                 if let Some(reading) = self.exp_filter.feed(raw, &self.estimator) {
-                    self.accept_reading(reading);
+                    self.accept_reading(t_ms, reading);
                 }
             }
             Observation::Stack(lines) => {
@@ -181,6 +198,37 @@ impl Session {
             Observation::Unreadable => {}
         }
         self.rolling.record(self.active_ms(t_ms), self.exp_gained, self.meso_gained);
+        self.track_minutes(t_ms);
+    }
+
+    /// The finished session for history; `None` until it's stopped, or if no
+    /// EXP reading was ever accepted.
+    pub fn record(&self) -> Option<SessionRecord> {
+        Some(SessionRecord {
+            version: RECORD_VERSION,
+            started_ms: self.started_ms?,
+            stopped_ms: self.stopped_ms?,
+            active_ms: self.active_before_ms,
+            paused_ms: self.paused_before_ms,
+            exp_gained: self.exp_gained,
+            start: self.start_reading?,
+            end: self.last_reading?,
+            level_ups: self.level_ups.clone(),
+            exp_by_minute: self.exp_by_minute.clone(),
+            exp_approximate: self.exp_approximate,
+            meso_gained: Some(self.meso_gained),
+        })
+    }
+
+    /// Notes EXP gained at each whole minute of active time passed so far.
+    /// Gains are only ever added at accepted readings, so a minute that
+    /// ended between two observations gets the total from before them.
+    fn track_minutes(&mut self, t_ms: u64) {
+        let minutes = (self.active_ms(t_ms) / 60_000) as usize;
+        while self.exp_by_minute.len() < minutes {
+            self.exp_by_minute.push(self.minute_total);
+        }
+        self.minute_total = self.exp_gained;
     }
 
     pub fn snapshot(&self, t_ms: u64) -> Snapshot {
@@ -237,7 +285,7 @@ impl Session {
         }
     }
 
-    fn accept_reading(&mut self, r: ExpReading) {
+    fn accept_reading(&mut self, t_ms: u64, r: ExpReading) {
         match self.last_reading {
             Some(prev) if !self.exp_needs_baseline => {
                 if r.level < prev.level {
@@ -248,6 +296,7 @@ impl Session {
                     self.exp_gained += r.exp.saturating_sub(prev.exp);
                 } else {
                     self.exp_gained += self.level_up_gain(prev, r);
+                    self.level_ups.push(LevelUp { at_ms: t_ms, active_ms: self.active_ms(t_ms), to_level: r.level });
                 }
             }
             _ => {
