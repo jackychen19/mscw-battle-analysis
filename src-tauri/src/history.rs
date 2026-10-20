@@ -6,6 +6,14 @@ use std::path::{Path, PathBuf};
 use battle_core::stats::{ExpReading, SessionRecord};
 use serde::Serialize;
 
+/// Sessions shorter than this (active time) aren't saved: accidental starts.
+const MIN_ACTIVE_MS: u64 = 10_000;
+
+/// Whether a finished session is long enough to keep.
+pub fn worth_saving(r: &SessionRecord) -> bool {
+    r.active_ms >= MIN_ACTIVE_MS
+}
+
 /// A [`SessionRecord`] with its clock times turned into wall-clock dates
 /// (Unix milliseconds, UTC; shown in local time when displayed).
 #[derive(Serialize)]
@@ -99,5 +107,26 @@ mod tests {
         assert_eq!(json["end"]["pctHundredths"], 25);
         assert_eq!(json["expByMinute"][0], 650);
         assert!(json["mesoGained"].is_null(), "on hold: not measured");
+    }
+
+    #[test]
+    fn short_sessions_are_not_worth_saving() {
+        let r = |active_ms| SessionRecord {
+            version: RECORD_VERSION,
+            started_ms: 0,
+            stopped_ms: active_ms + 60_000,
+            active_ms,
+            paused_ms: 60_000,
+            exp_gained: 0,
+            start: ExpReading::new(10, 1_000, 5_000),
+            end: ExpReading::new(10, 1_000, 5_000),
+            level_ups: Vec::new(),
+            exp_by_minute: Vec::new(),
+            exp_approximate: false,
+            meso_gained: None,
+        };
+        // A minute paused doesn't count toward the 10 s.
+        assert!(!worth_saving(&r(9_999)));
+        assert!(worth_saving(&r(10_000)));
     }
 }

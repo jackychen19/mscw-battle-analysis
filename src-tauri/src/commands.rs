@@ -62,9 +62,13 @@ impl AppState {
         self.history_dir = Some(dir);
     }
 
-    /// Saves the stopped session to history. Mock-feed sessions aren't saved.
+    /// Saves the stopped session to history. Mock-feed sessions and ones
+    /// under 10 s of active time aren't saved.
     fn save_session(&self) {
         let (Some(dir), Some(record), None) = (&self.history_dir, self.session.record(), &self.feed) else { return };
+        if !history::worth_saving(&record) {
+            return;
+        }
         let saved = SavedSession::new(record, |t| self.origin_unix_ms + t);
         match history::save(dir, &saved) {
             Ok(path) => eprintln!("[history] saved {}", path.display()),

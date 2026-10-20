@@ -71,7 +71,7 @@ When you stop a session, its numbers are saved as one small JSON file in the app
 - EXP gained at the end of every active minute, so any stretch's rate can be worked out later
 - whether a level-up's EXP was estimated
 
-Rates aren't stored, since they follow from these. Mesos are left empty while meso tracking is on hold. Sessions from the mock feed aren't saved. A debrief view of past sessions is planned.
+Rates aren't stored, since they follow from these. Mesos are left empty while meso tracking is on hold. Sessions shorter than 10 seconds of active time, and sessions from the mock feed, aren't saved. A debrief view of past sessions is planned.
 
 ## Roadmap
 
