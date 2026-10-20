@@ -1,5 +1,6 @@
+use std::path::PathBuf;
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use battle_core::calibration::{Missing, Regions, Sample};
 use battle_core::capture::{Frame, RectPt, WindowInfo};
@@ -9,11 +10,16 @@ use tauri::ipc::Response;
 use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::capture::{self, Permission};
+use crate::history::{self, SavedSession};
 use crate::live::{CaptureStatus, Capturer, Tick};
 use crate::mock_feed::MockFeed;
 
 pub struct AppState {
     origin: Instant,
+    /// Unix time (ms) of `origin`, to date saved sessions.
+    origin_unix_ms: u64,
+    /// Where finished sessions are saved; set once the app's data dir is known.
+    history_dir: Option<PathBuf>,
     session: Session,
     last_session: Option<Snapshot>,
     /// Synthetic feed instead of the game (`BATTLE_MOCK=1`).
@@ -42,11 +48,27 @@ impl AppState {
     pub fn new(mock: bool) -> Self {
         Self {
             origin: Instant::now(),
+            origin_unix_ms: SystemTime::now().duration_since(UNIX_EPOCH).map_or(0, |d| d.as_millis() as u64),
+            history_dir: None,
             session: Session::new(SessionConfig::default()),
             last_session: None,
             feed: mock.then(MockFeed::new),
             capture: CaptureStatus { permission: capture::permission(), game: None, calibrated: false, learning: None },
             auto_paused: false,
+        }
+    }
+
+    pub fn set_history_dir(&mut self, dir: PathBuf) {
+        self.history_dir = Some(dir);
+    }
+
+    /// Saves the stopped session to history. Mock-feed sessions aren't saved.
+    fn save_session(&self) {
+        let (Some(dir), Some(record), None) = (&self.history_dir, self.session.record(), &self.feed) else { return };
+        let saved = SavedSession::new(record, |t| self.origin_unix_ms + t);
+        match history::save(dir, &saved) {
+            Ok(path) => eprintln!("[history] saved {}", path.display()),
+            Err(e) => eprintln!("[history] couldn't save the session: {e}"),
         }
     }
 
@@ -97,6 +119,9 @@ impl AppState {
         }
         self.session.apply(t, command).map_err(|e| e.to_string())?;
         self.auto_paused = false;
+        if command == Command::Stop {
+            self.save_session();
+        }
         Ok(())
     }
 }

@@ -96,6 +96,7 @@ Stop after each and summarize for review.
 3. **Live capture + calibration** ✅: macOS `FrameSource`, Screen Recording permission flow, window picker, automatic calibration (manual fallback). Confirmed working on the user's machine.
 4. **Floating panel:** always visible over the fullscreen game without stealing focus.
 5. **Mesos end-to-end + polish:** stack alignment wired to live capture, debug-crop mode, sessions saved to local history (JSON).
+   **Decided:** history was done early (after M3): on Stop, `sessions/<startedAt>.json` in the app data dir holds start/stop dates (Unix ms), active and paused time, EXP gained, start and end readings, level-ups with dates, cumulative EXP at each active minute, the approximate flag, and `mesoGained` (null while on hold). Rates aren't stored. It feeds a planned post-session debrief dashboard.
 
 **Mesos on hold (decided):** the notification stack is too noisy over map art (one kill adds 2–4 lines, top lines get lost) to trust without a confirmed ground truth. EXP comes first. An idea to revisit: have the user open the inventory at session start to read the meso total, then update the total whenever the inventory is open again. That reads one number on a solid background instead of following a moving stack.
 

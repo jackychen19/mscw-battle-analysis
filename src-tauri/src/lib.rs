@@ -1,5 +1,6 @@
 mod capture;
 mod commands;
+mod history;
 mod live;
 mod mock_feed;
 mod window;
@@ -41,7 +42,9 @@ pub fn run() {
             if let Some(main) = app.get_webview_window("main") {
                 BasicFloating.make_floating(&main)?;
             }
-            app.manage(Mutex::new(Capturer::new(app.path().app_data_dir()?)));
+            let data_dir = app.path().app_data_dir()?;
+            app.state::<Mutex<AppState>>().lock().unwrap().set_history_dir(data_dir.clone());
+            app.manage(Mutex::new(Capturer::new(data_dir)));
 
             let handle = app.handle().clone();
             thread::spawn(move || {

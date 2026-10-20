@@ -27,7 +27,7 @@ Battle Analysis reads **only the pixels of the game window**, the same way a scr
 3. A reading only counts when it's self-consistent (EXP agrees with percent) and two consecutive frames agree. Frames that can't be read, such as menus, tooltips, the Cash Shop or loading screens, are skipped rather than treated as zero.
 4. Leveling up adds the rest of the old level plus the EXP into the new one. Dying (EXP going down) adds nothing. Each meso notification is counted once, including several identical `+15` lines in a row.
 
-**Privacy:** Frames are processed in memory and discarded. Nothing is saved to disk except your calibration, plus small cropped text regions if you turn on the off-by-default debug mode. The app makes **no network connections**: fonts are bundled and everything stays on your machine.
+**Privacy:** Frames are processed in memory and discarded. Nothing is saved to disk except your calibration, your session history (numbers only, see below), and small cropped text regions if you turn on the off-by-default debug mode. The app makes **no network connections**: fonts are bundled and everything stays on your machine.
 
 **What it never does:** read or write game memory, inject into the game process, or send any keyboard/mouse input.
 
@@ -60,6 +60,18 @@ If it can't find the EXP bar, the calibration window (green ⚙ button) has a ma
 **Start Analyzing** stays disabled until the game window is found and calibrated. If the window goes away mid-session, recording pauses automatically.
 
 Calibration is saved locally in the app's data directory (`calibration.json`). It's redone automatically if you resize the game window or change display scaling.
+
+## Session history
+
+When you stop a session, its numbers are saved as one small JSON file in the app's data directory, under `sessions/` (on macOS, `~/Library/Application Support/com.jackychen.battleanalysis/sessions/`). Each file holds:
+
+- start and stop time, active time and paused time
+- EXP gained, and the level/EXP/percent at the start and end
+- each level-up and when it happened
+- EXP gained at the end of every active minute, so any stretch's rate can be worked out later
+- whether a level-up's EXP was estimated
+
+Rates aren't stored, since they follow from these. Mesos are left empty while meso tracking is on hold. Sessions from the mock feed aren't saved. A debrief view of past sessions is planned.
 
 ## Roadmap
 
