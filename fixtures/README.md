@@ -37,6 +37,10 @@ A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, 
 
 `bar.png`: the status bar cut from a macOS screenshot of the game window (Lv 33, EXP 117,832 [84.98%]). Unlike grinding-01 it's sharp, as a direct window capture is: each character is drawn identically.
 
+### native-02
+
+`bar.png`: the same, at Lv 34, EXP 27,066 [17.40%]. Its `4` (closed, slanted top) was once read as `8`.
+
 ## Never committed (gitignored)
 
 - `video/`: gameplay recordings.

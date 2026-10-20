@@ -118,3 +118,13 @@ fn finds_exp_and_level_on_a_native_capture() {
     let level = find_level_near(&bar, exp).expect("level");
     assert_eq!(ExpReader::default().read_level(&bar.crop(level)), Some(33));
 }
+
+#[test]
+fn reads_a_closed_top_four() {
+    // Lv 34, EXP 27,066 [17.40%]. The game's 4 has a closed, slanted top
+    // (once misread as 8).
+    let bar = common::load_png(&common::fixtures_dir().join("native-02/bar.png"));
+    let exp = find_exp_text(&bar).expect("EXP line");
+    let level = find_level_near(&bar, exp).expect("level");
+    assert_eq!(ExpReader::default().read_level(&bar.crop(level)), Some(34));
+}
