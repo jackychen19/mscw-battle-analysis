@@ -4,7 +4,7 @@ A small floating panel for **MapleStory Classic World** that tracks how much EXP
 
 > **Not affiliated with or endorsed by Nexon. Read-only screen capture; no game memory access or input automation. Use at your own risk.**
 
-> **Status:** early development. EXP tracking from live macOS capture works, with automatic calibration (Milestone 3); mesos are on hold. See [Roadmap](#roadmap).
+> **Status:** early development. EXP tracking from live macOS capture works, with automatic calibration and a floating panel that stays over the fullscreen game (Milestone 4); mesos are on hold. See [Roadmap](#roadmap).
 
 ## What it tracks
 
@@ -17,6 +17,8 @@ A small floating panel for **MapleStory Classic World** that tracks how much EXP
 | Time to next level | Remaining EXP ÷ current rate |
 
 The results view shows your level range (e.g. Lv. 59 → 60) and how much paused time was excluded.
+
+The panel floats above the game, fullscreen included, and never takes keyboard focus, so clicking Start or Pause doesn't interrupt your play. It has no Dock icon; close it with ×.
 
 ## How it works
 
@@ -77,7 +79,7 @@ Rates aren't stored, since they follow from these. Mesos are left empty while me
 - [x] **M1**: Project scaffold, stats engine with tests, UI on mock data
 - [x] **M2**: Bitmap-font parser for EXP and notification text, tested against real screenshots
 - [x] **M3**: Live macOS capture (ScreenCaptureKit), permission flow, window picker, automatic calibration
-- [ ] **M4**: Floating panel that stays above the fullscreen game without stealing focus
+- [x] **M4**: Floating panel that stays above the fullscreen game without stealing focus
 - [ ] **M5**: Mesos end-to-end, debug-crop mode, local session history
 - [ ] **Windows** support (Windows.Graphics.Capture). Capture and floating-window code already sit behind traits, and display scale (125% / 150%) is never hardcoded.
 - [ ] Static level → EXP table for Classic World (currently each level's max EXP is derived from EXP ÷ percent; see below)
