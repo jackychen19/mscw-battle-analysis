@@ -9,7 +9,7 @@ use battle_core::calibration::{
     find_exp_text, find_game_window, find_level_near, find_regions, missing_chars, teach_sample,
 };
 use battle_core::capture::{CaptureError, Frame, FrameSource, RectPt, WindowInfo};
-use battle_core::parse::ExpReader;
+use battle_core::parse::{ExpReader, exp_line_with};
 use battle_core::stats::Observation;
 use serde::Serialize;
 
@@ -24,6 +24,8 @@ const LOCATE_EVERY: Duration = Duration::from_secs(3);
 const LOCATE_BANDS: [f64; 4] = [0.125, 0.25, 0.5, 1.0];
 /// Distinct samples without a solution before the boxes are looked for again.
 const RELOCATE_AFTER: usize = 24;
+/// At most one log line per this long about EXP boxes the learner can't use.
+const REJECT_LOG_EVERY: Duration = Duration::from_secs(5);
 
 /// What the panel needs to know about capture.
 #[derive(Clone, Debug, Serialize)]
@@ -54,6 +56,7 @@ struct Auto {
     regions: Option<Regions>,
     learner: ExpFontLearner,
     last_locate: Option<Instant>,
+    last_reject_log: Option<Instant>,
 }
 
 /// Result of a capture tick while recording.
@@ -147,6 +150,12 @@ impl Capturer {
         if self.game.as_ref() != Some(&found) {
             if self.game.as_ref().is_none_or(|g| g.id != found.id || g.bounds.w != found.bounds.w || g.bounds.h != found.bounds.h) {
                 // Another window, or resized: the boxes may have moved.
+                if let Some(g) = &self.game {
+                    eprintln!(
+                        "[scan] game window changed: id {} {}x{} -> id {} {}x{}; calibrating again",
+                        g.id, g.bounds.w, g.bounds.h, found.id, found.bounds.w, found.bounds.h
+                    );
+                }
                 self.auto = Auto::default();
             }
             self.game = self.source.select_window(found.id).map_err(|e| self.on_error(&e)).ok();
@@ -205,11 +214,36 @@ impl Capturer {
             self.auto.learner = ExpFontLearner::with_ink(regions.ink);
         }
         let Ok(crop) = self.capture(regions.exp_text) else { return };
-        let before = self.auto.learner.sample_count();
-        if !self.auto.learner.add(&crop) || self.auto.learner.sample_count() == before {
+        // The EXP font is built in: if the text reads by shape, that's the
+        // whole calibration. Learning it from kills is only the fallback.
+        let by_shape = ExpReader { ink: regions.ink, ..ExpReader::default() };
+        if ready.is_none() && by_shape.read_exp(&crop).is_some() {
+            let cal = Calibration::new(&game, regions, by_shape);
+            if save(&self.dir, &cal).is_ok() {
+                eprintln!("[learn] EXP reads by shape: calibrated");
+                self.calibration = Some(cal);
+                self.chosen = Some(WindowMatch::of(&game));
+            }
             return;
         }
+        let before = self.auto.learner.sample_count();
+        if !self.auto.learner.add(&crop) {
+            if self.auto.last_reject_log.is_none_or(|t| t.elapsed() >= REJECT_LOG_EVERY) {
+                self.auto.last_reject_log = Some(Instant::now());
+                let glyphs = exp_line_with(&crop, regions.ink).map(|l| l.glyphs);
+                eprintln!("[learn] EXP box {}x{} px not usable (ink {:?}): glyphs {glyphs:?}", crop.width, crop.height, regions.ink);
+            }
+            return;
+        }
+        if self.auto.learner.sample_count() == before {
+            return;
+        }
+        eprintln!("[learn] {} samples", self.auto.learner.sample_count());
         let Some(font) = self.auto.learner.solve() else {
+            if self.auto.learner.sample_count() >= NEEDED_SAMPLES {
+                let why = self.auto.learner.describe();
+                eprintln!("[learn] {}", why.lines().last().unwrap_or_default());
+            }
             if ready.is_none() && self.auto.learner.sample_count() >= RELOCATE_AFTER {
                 self.auto = Auto::default();
             }
@@ -269,6 +303,10 @@ impl Capturer {
         let read = ExpReader::default().read_level(&level);
         eprintln!("[locate] level reads {read:?}");
         read?;
+        if let Ok(own) = self.capture(regions.exp_text) {
+            let reads = ExpReader { ink: regions.ink, ..ExpReader::default() }.read_exp(&own);
+            eprintln!("[locate] EXP box {}x{} px, ink {:?}: reads {reads:?} by shape", own.width, own.height, regions.ink);
+        }
         self.auto.regions = Some(regions);
         Some(regions)
     }
