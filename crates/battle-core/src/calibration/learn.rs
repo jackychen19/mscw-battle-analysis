@@ -235,8 +235,9 @@ impl Layout {
     /// `looks_open(g, close)`: how much group `g` looks like group `close` mirrored.
     fn find(samples: &[Vec<usize>], looks_open: impl Fn(usize, usize) -> f32) -> Option<Self> {
         let at = |s: &Vec<usize>, from_end: usize| s.len().checked_sub(from_end).map(|i| s[i]);
+        let first_sample = samples.first()?;
         let same = |from_end: usize| {
-            let first = at(&samples[0], from_end)?;
+            let first = at(first_sample, from_end)?;
             samples.iter().all(|s| at(s, from_end) == Some(first)).then_some(first)
         };
         // `…[P.PP%]` or `…[PP.PP%]`.
@@ -248,7 +249,7 @@ impl Layout {
         // `[` sits 7th or 8th from the end in every sample.
         // When both could be (`36.84%` always puts a `3` 7th from the end), the
         // one shaped like a mirrored `]` wins.
-        let open = [at(&samples[0], 7), at(&samples[0], 8)]
+        let open = [at(first_sample, 7), at(first_sample, 8)]
             .into_iter()
             .flatten()
             .filter(|&g| not_digit(g) && samples.iter().all(|s| at(s, 7) == Some(g) || at(s, 8) == Some(g)))
