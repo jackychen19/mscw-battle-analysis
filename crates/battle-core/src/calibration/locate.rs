@@ -6,7 +6,7 @@ use std::ops::Range;
 
 use super::Regions;
 use crate::capture::{Frame, RectPt, RectPx};
-use crate::parse::{Channel, ExpInk, Gray, TextLine, exp_line_with, similarity};
+use crate::parse::{Channel, ExpInk, Gray, TextLine, exp_line_with, read_exp_by_shape, similarity, words};
 
 /// Pixels at least this bright can be the white text.
 const TEXT_LUMA: u8 = 150;
@@ -77,7 +77,9 @@ pub fn find_exp_text(frame: &Frame) -> Option<RectPx> {
 
 /// [`find_exp_text`] and the ink threshold its layout checked out with:
 /// Otsu's for crisp text, the softer one for a fullscreen game stretched to
-/// the display.
+/// the display. Soft text can fool the layout check with Otsu's (glyphs cut
+/// into slivers pass for `[`, `.` and `]`, giving a box around part of the
+/// number), so a box that also reads by shape wins.
 fn find_exp(frame: &Frame) -> Option<(RectPx, ExpInk)> {
     let gray = Gray::from_frame(frame, Channel::Luma);
     let glyphs: Vec<Blob> = blobs(gray.width(), gray.height(), |x, y| gray.get(x, y) >= TEXT_LUMA)
@@ -87,9 +89,12 @@ fn find_exp(frame: &Frame) -> Option<(RectPx, ExpInk)> {
     // HP and MP have brackets too but not the percent layout; if several
     // rows qualify, the lowest, rightmost one is the status bar's.
     let rows = lines(&glyphs);
-    [ExpInk::Otsu, ExpInk::Soft].into_iter().find_map(|ink| {
-        rows.iter().filter_map(|line| exp_in_line(frame, line, ink)).max_by_key(|r| (r.y, r.x)).map(|r| (r, ink))
-    })
+    let found: Vec<(RectPx, ExpInk)> = [ExpInk::Otsu, ExpInk::Soft]
+        .into_iter()
+        .filter_map(|ink| rows.iter().filter_map(|line| exp_in_line(frame, line, ink)).max_by_key(|r| (r.y, r.x)).map(|r| (r, ink)))
+        .collect();
+    let reads = |&(r, ink): &(RectPx, ExpInk)| exp_line_with(&frame.crop(r), ink).and_then(|l| read_exp_by_shape(&l)).is_some();
+    found.iter().copied().find(reads).or(found.first().copied())
 }
 
 /// Chains of bright blobs left to right that sit on one text row. Blur can
@@ -137,24 +142,6 @@ fn exp_in_line(frame: &Frame, chain: &[Blob], ink: ExpInk) -> Option<RectPx> {
     let area = RectPx { x: left, y: y0, w: right - left, h: (bottom + 1).min(frame.height) - y0 };
     let line = exp_line_with(&frame.crop(area), ink)?;
     words(&line.glyphs).into_iter().find_map(|word| exp_in_word(frame, area, &line, word))
-}
-
-/// Glyph index ranges split at gaps clearly wider than the letter spacing.
-fn words(runs: &[Range<u32>]) -> Vec<Range<usize>> {
-    let gaps: Vec<u32> = runs.windows(2).map(|w| w[1].start - w[0].end).collect();
-    let mut sorted = gaps.clone();
-    sorted.sort_unstable();
-    let median = sorted.get(sorted.len() / 2).copied().unwrap_or(1);
-    let mut out = Vec::new();
-    let mut start = 0;
-    for (i, &g) in gaps.iter().enumerate() {
-        if g > median * 2 && g >= median + 2 {
-            out.push(start..i + 1);
-            start = i + 1;
-        }
-    }
-    out.push(start..runs.len());
-    out
 }
 
 /// `word` of `line` (cropped from `area` of the frame) if it's the EXP number

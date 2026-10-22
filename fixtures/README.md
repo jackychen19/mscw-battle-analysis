@@ -45,6 +45,10 @@ A screen recording of a YouTube video of PixelParakeet's stream (Lv59 Assassin, 
 
 `bar.png`: the status bar cut from a macOS screenshot of the game in fullscreen (Lv 34, EXP 50,182 [32.26%]). The game draws 1920x1080 and macOS stretches it 1.998x to a 3836x2154 display with smoothing, so the text is soft: Otsu's split cuts its glyphs apart.
 
+### fullscreen-02
+
+`bar.png`: the same, after turning the macOS stretch off in the game's settings (Lv 34, EXP 69,035 [44.38%]). Each game pixel is now exactly 2x2, but the game still scales its UI up smoothly in fullscreen, so the text stays soft: two `4`s side by side match each other less than an `8` matches a `9`. It's also the first capture with a `5`.
+
 ## Never committed (gitignored)
 
 - `video/`: gameplay recordings.

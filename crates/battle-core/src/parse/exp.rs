@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::blocky::read_blocky_digits;
+use super::exp_shape::read_exp_by_shape;
 use super::glyph::{DEFAULT_MIN_SCORE, GlyphSet, TeachError};
 use super::gray::{Channel, Gray};
 use super::line::TextLine;
@@ -54,8 +55,12 @@ impl ExpReader {
         Some(ExpReading { level, exp, pct_hundredths })
     }
 
+    /// With no EXP templates taught, the text is read by shape.
     pub fn read_exp(&self, crop: &Frame) -> Option<(u64, u32)> {
         let line = exp_line_with(crop, self.ink)?;
+        if self.exp_glyphs.is_empty() {
+            return read_exp_by_shape(&line);
+        }
         parse_exp_text(&self.exp_glyphs.read(&line, self.min_score)?.text)
     }
 

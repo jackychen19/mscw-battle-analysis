@@ -7,6 +7,7 @@
 mod bitmap;
 mod blocky;
 mod exp;
+mod exp_shape;
 mod glyph;
 mod gray;
 mod line;
@@ -17,9 +18,10 @@ pub(crate) mod test_font;
 
 pub use bitmap::Bitmap;
 pub use blocky::read_blocky_digits;
+pub use exp_shape::read_exp_by_shape;
 pub use exp::{ExpInk, ExpReader, exp_line, exp_line_with, format_exp_text, level_line, parse_exp_text, parse_level_text};
 pub use glyph::{DEFAULT_MIN_SCORE, GlyphSet, GlyphTemplate, LineRead, TeachError, similarity};
 pub use gray::{Channel, Gray};
-pub use line::TextLine;
+pub use line::{TextLine, words};
 pub use notice::{NoticeReader, PREFIX_MIN_SCORE, PrefixTemplate, StackLayout};
 pub use segment::{column_runs, row_runs};

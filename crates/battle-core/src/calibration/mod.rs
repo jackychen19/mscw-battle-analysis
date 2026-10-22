@@ -63,8 +63,11 @@ impl Calibration {
     }
 
     /// Characters the EXP and level readers haven't been taught yet.
+    /// Characters with no template yet. Nothing taught means read by shape,
+    /// which knows them all.
     pub fn missing(&self) -> Missing {
-        Missing { exp: missing_chars(&self.exp.exp_glyphs, EXP_CHARS), level: missing_chars(&self.exp.level_glyphs, LEVEL_CHARS) }
+        let missing = |set: &GlyphSet, chars: &str| if set.is_empty() { String::new() } else { missing_chars(set, chars) };
+        Missing { exp: missing(&self.exp.exp_glyphs, EXP_CHARS), level: missing(&self.exp.level_glyphs, LEVEL_CHARS) }
     }
 }
 

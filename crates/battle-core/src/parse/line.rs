@@ -94,6 +94,24 @@ fn split_on_cores(low: &Bitmap, high: &Bitmap) -> Vec<Range<u32>> {
     out
 }
 
+/// Glyph index ranges split at gaps clearly wider than the letter spacing.
+pub fn words(runs: &[Range<u32>]) -> Vec<Range<usize>> {
+    let gaps: Vec<u32> = runs.windows(2).map(|w| w[1].start - w[0].end).collect();
+    let mut sorted = gaps.clone();
+    sorted.sort_unstable();
+    let median = sorted.get(sorted.len() / 2).copied().unwrap_or(1);
+    let mut out = Vec::new();
+    let mut start = 0;
+    for (i, &g) in gaps.iter().enumerate() {
+        if g > median * 2 && g >= median + 2 {
+            out.push(start..i + 1);
+            start = i + 1;
+        }
+    }
+    out.push(start..runs.len());
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
