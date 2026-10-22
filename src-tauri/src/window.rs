@@ -2,10 +2,23 @@
 //! always-on-top; on macOS `MacPanel` turns the window into a non-activating
 //! NSPanel that sits over the fullscreen game without taking focus from it.
 
-use tauri::WebviewWindow;
+use tauri::{WebviewWindow, Window};
 
 pub trait FloatingWindow {
     fn make_floating(&self, window: &WebviewWindow) -> tauri::Result<()>;
+
+    /// Undoes whatever must not outlive the window; call when it's asked to close.
+    fn before_close(&self, _window: &Window) -> tauri::Result<()> {
+        Ok(())
+    }
+}
+
+/// This platform's floating behaviour.
+pub fn platform() -> &'static dyn FloatingWindow {
+    #[cfg(target_os = "macos")]
+    return &MacPanel;
+    #[cfg(not(target_os = "macos"))]
+    return &BasicFloating;
 }
 
 /// Portable fallback: always on top, on every workspace.
@@ -26,15 +39,22 @@ pub use macos::MacPanel;
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use objc2::runtime::{AnyObject, NSObject};
+    use std::sync::OnceLock;
+
+    use objc2::runtime::{AnyClass, AnyObject, NSObject};
     use objc2::{define_class, ClassType, MainThreadOnly};
     use objc2_app_kit::{
         NSPanel, NSPopUpMenuWindowLevel, NSResponder, NSWindow, NSWindowCollectionBehavior,
         NSWindowStyleMask,
     };
-    use tauri::WebviewWindow;
+    use tauri::{WebviewWindow, Window};
 
     use super::FloatingWindow;
+
+    /// The window's class before it became a panel. WebKit has already added
+    /// key-value observers to the window (its `contentLayoutRect`), so this is
+    /// KVO's subclass of tao's window, and only under it can WebKit remove them.
+    static ORIGINAL_CLASS: OnceLock<&'static AnyClass> = OnceLock::new();
 
     define_class!(
         // A panel that never becomes key: clicks reach the webview (acceptFirstMouse),
@@ -103,7 +123,8 @@ mod macos {
             // replaced by NSPanel's, and its `focusable` ivar is only touched at
             // creation and by `set_focusable`, which we never call.
             unsafe {
-                AnyObject::set_class(&*ptr, BattlePanel::class());
+                let original = AnyObject::set_class(&*ptr, BattlePanel::class());
+                let _ = ORIGINAL_CLASS.set(original);
                 let panel = &*(ptr as *const NSPanel);
                 panel.setStyleMask(panel.styleMask() | NSWindowStyleMask::NonactivatingPanel);
                 panel.setFloatingPanel(true);
@@ -117,6 +138,23 @@ mod macos {
                         | NSWindowCollectionBehavior::Stationary
                         | NSWindowCollectionBehavior::IgnoresCycle,
                 );
+            }
+            Ok(())
+        }
+
+        /// Back to the original class before the webview is torn down: under the
+        /// panel's class AppKit can't find WebKit's observers to remove, raises,
+        /// and the exception aborts the app (a crash on close).
+        fn before_close(&self, window: &Window) -> tauri::Result<()> {
+            let Some(original) = ORIGINAL_CLASS.get() else { return Ok(()) };
+            let ptr = window.ns_window()? as *mut AnyObject;
+            // SAFETY: `ptr` is the live NSWindow behind `window`, on the main thread
+            // (window events are delivered there). Only our own swap is undone.
+            unsafe {
+                let obj = &*ptr;
+                if std::ptr::eq(obj.class(), BattlePanel::class()) {
+                    AnyObject::set_class(obj, original);
+                }
             }
             Ok(())
         }

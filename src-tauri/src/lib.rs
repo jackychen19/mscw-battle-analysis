@@ -13,7 +13,6 @@ use tauri::Manager;
 
 use commands::AppState;
 use live::Capturer;
-use window::FloatingWindow;
 
 /// EXP region capture rate (~2 fps).
 const CAPTURE_EVERY: Duration = Duration::from_millis(500);
@@ -40,15 +39,20 @@ pub fn run() {
             commands::teach_sample,
             commands::reset_calibration,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event
+                && window.label() == "main"
+                && let Err(e) = window::platform().before_close(window)
+            {
+                eprintln!("[window] couldn't prepare the panel to close: {e}");
+            }
+        })
         .setup(move |app| {
             // An accessory app (no Dock icon) can put its panel over another app's fullscreen Space.
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             if let Some(main) = app.get_webview_window("main") {
-                #[cfg(target_os = "macos")]
-                window::MacPanel.make_floating(&main)?;
-                #[cfg(not(target_os = "macos"))]
-                window::BasicFloating.make_floating(&main)?;
+                window::platform().make_floating(&main)?;
             }
             let data_dir = app.path().app_data_dir()?;
             app.state::<Mutex<AppState>>().lock().unwrap().set_history_dir(data_dir.clone());
