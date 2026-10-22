@@ -23,7 +23,7 @@ The results view shows your level range (e.g. Lv. 59 → 60) and how much paused
 Battle Analysis reads **only the pixels of the game window**, the same way a screen recorder does:
 
 1. While you're recording, it captures two small regions of the game window: the EXP text (about 2×/s) and the notification area (about 5×/s).
-2. The game draws text in a fixed bitmap font, so instead of general OCR each region is binarized, split into characters, and matched against glyph templates learned from *your* screen during calibration.
+2. The game draws its text in a small fixed pixel font, and Battle Analysis has that font built in. Instead of general OCR, each region is split into characters and each one is matched by its shape. A little blur, like a fullscreen game stretched to fit your display, doesn't get in the way.
 3. A reading only counts when it's self-consistent (EXP agrees with percent) and two consecutive frames agree. Frames that can't be read, such as menus, tooltips, the Cash Shop or loading screens, are skipped rather than treated as zero.
 4. Leveling up adds the rest of the old level plus the EXP into the new one. Dying (EXP going down) adds nothing. Each meso notification is counted once, including several identical `+15` lines in a row.
 
@@ -50,10 +50,9 @@ Capture uses ScreenCaptureKit screenshots of just the text regions, which needs 
 There's nothing to set up: with the game open, Battle Analysis calibrates itself.
 
 1. It finds the MapleStory window, then the EXP text and the level on the status bar at the bottom.
-2. It learns the game's digits on its own. The EXP line always has the same layout (`422,579[36.84%]`), so the brackets, `%`, `.` and `,` are known from where they sit. The digits are the one assignment for which EXP ÷ percent comes out the same across readings. Just play: a few kills give it enough different readings. The panel shows *Learning the game's font* until it's done.
-3. The level's blocky digits are read by their shape, so a level-up to digits it hasn't seen yet still reads.
+2. It reads the EXP digits with the game's font built in, so it's ready as soon as the EXP bar is found, windowed or fullscreen. The level's blocky digits are read by their shape the same way, so a level-up to digits it hasn't shown yet still reads.
 
-Digits that haven't appeared yet keep being learned in the background; readings that need one are skipped until then.
+If the EXP text ever doesn't match the built-in font, it falls back to learning the digits from your screen. The EXP line always has the same layout (`422,579[36.84%]`), so the brackets, `%`, `.` and `,` are known from where they sit, and the digits are the one assignment for which EXP ÷ percent comes out the same across readings. A few kills give it enough different readings; the panel shows *Learning the game's font* until it's done.
 
 If it can't find the EXP bar, the calibration window (green ⚙ button) has a manual fallback: drag boxes around the EXP text and the level, type what they show, and click **Learn**.
 
